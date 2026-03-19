@@ -1,5 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+
+type User = { email: string } | null;
 
 export default function PlayUp() {
   const [activeTab, setActiveTab] = useState<"lessons"|"events">("lessons");
@@ -9,10 +12,67 @@ export default function PlayUp() {
   const [joinedEvents, setJoinedEvents] = useState<number[]>([]);
   const [searchText, setSearchText] = useState("");
   const [searchPostcode, setSearchPostcode] = useState("");
+  const [user, setUser] = useState<User>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+
+  // Auth form state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+
+  // Check if user is already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ? { email: session.user.email! } : null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { email: session.user.email! } : null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 3000);
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  const handleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthLoading(false);
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setModal(null);
+      setEmail(""); setPassword("");
+      showToast("Welcome back! You're logged in 🎉");
+    }
+  };
+
+  const handleSignup = async () => {
+    setAuthLoading(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { first_name: firstName, last_name: lastName } }
+    });
+    setAuthLoading(false);
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setModal(null);
+      setEmail(""); setPassword(""); setFirstName(""); setLastName("");
+      showToast("Account created! Check your email to confirm your account 📧");
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    showToast("You've been logged out. See you soon!");
   };
 
   const lessons = [
@@ -44,6 +104,18 @@ export default function PlayUp() {
 
   const colorMap: Record<string, string> = { lime:"#C8F135", orange:"#FF6B35", blue:"#35C8F1" };
 
+  const inputStyle = {
+    width:"100%", background:"#172510", border:"1px solid #3a5a2a",
+    borderRadius:10, padding:"0.7rem 1rem", color:"#e8f5d8",
+    fontSize:"0.9rem", outline:"none"
+  };
+
+  const labelStyle = {
+    display:"block" as const, fontSize:"0.78rem", fontWeight:700,
+    letterSpacing:0.8, textTransform:"uppercase" as const,
+    color:"#8aab72", marginBottom:"0.4rem"
+  };
+
   return (
     <>
       <style>{`
@@ -71,9 +143,18 @@ export default function PlayUp() {
           ))}
           <button className="btn" onClick={() => setModal("provider")} style={{background:"none",border:"none",color:"#8aab72",fontWeight:600,fontSize:"0.9rem"}}>List Your Lessons</button>
         </div>
-        <div style={{display:"flex",gap:"0.8rem"}}>
-          <button className="btn" onClick={() => setModal("login")} style={{padding:"0.5rem 1.2rem",border:"1px solid #3a5a2a",borderRadius:999,background:"transparent",color:"#e8f5d8",fontSize:"0.85rem"}}>Log In</button>
-          <button className="btn" onClick={() => setModal("signup")} style={{padding:"0.5rem 1.4rem",border:"none",borderRadius:999,background:"#C8F135",color:"#0F1A0A",fontWeight:700,fontSize:"0.85rem"}}>Sign Up Free</button>
+        <div style={{display:"flex",gap:"0.8rem",alignItems:"center"}}>
+          {user ? (
+            <>
+              <span style={{fontSize:"0.85rem",color:"#8aab72"}}>👋 {user.email.split("@")[0]}</span>
+              <button className="btn" onClick={handleLogout} style={{padding:"0.5rem 1.2rem",border:"1px solid #3a5a2a",borderRadius:999,background:"transparent",color:"#e8f5d8",fontSize:"0.85rem"}}>Log Out</button>
+            </>
+          ) : (
+            <>
+              <button className="btn" onClick={() => { setAuthError(""); setModal("login"); }} style={{padding:"0.5rem 1.2rem",border:"1px solid #3a5a2a",borderRadius:999,background:"transparent",color:"#e8f5d8",fontSize:"0.85rem"}}>Log In</button>
+              <button className="btn" onClick={() => { setAuthError(""); setModal("signup"); }} style={{padding:"0.5rem 1.4rem",border:"none",borderRadius:999,background:"#C8F135",color:"#0F1A0A",fontWeight:700,fontSize:"0.85rem"}}>Sign Up Free</button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -106,24 +187,13 @@ export default function PlayUp() {
       {/* SEARCH */}
       <section style={{padding:"2.5rem 2.5rem"}}>
         <div style={{display:"flex",gap:"0.5rem",background:"#172510",border:"1px solid #3a5a2a",borderRadius:16,padding:"0.6rem",maxWidth:900,flexWrap:"wrap"}}>
-          <input
-            placeholder="Search lessons, sports, activities..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            style={{flex:2,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:160}}
-          />
+          <input placeholder="Search lessons, sports, activities..." value={searchText} onChange={e => setSearchText(e.target.value)}
+            style={{flex:2,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:160}}/>
           <div style={{width:1,background:"#3a5a2a",margin:"0.2rem 0"}}/>
-          <input
-            placeholder="Postcode or suburb..."
-            value={searchPostcode}
-            onChange={e => setSearchPostcode(e.target.value)}
-            style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:140}}
-          />
+          <input placeholder="Postcode or suburb..." value={searchPostcode} onChange={e => setSearchPostcode(e.target.value)}
+            style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:140}}/>
           <div style={{width:1,background:"#3a5a2a",margin:"0.2rem 0"}}/>
-          <select
-            style={{background:"transparent",border:"none",outline:"none",color:"#8aab72",fontSize:"0.9rem",padding:"0.4rem 0.8rem",cursor:"pointer"}}
-            onChange={e => setSearchPostcode(e.target.value)}
-          >
+          <select style={{background:"transparent",border:"none",outline:"none",color:"#8aab72",fontSize:"0.9rem",padding:"0.4rem 0.8rem",cursor:"pointer"}} onChange={e => setSearchPostcode(e.target.value)}>
             <option value="">All Melbourne</option>
             {[["Richmond","3121"],["Fitzroy","3065"],["St Kilda","3182"],["South Yarra","3141"],["Carlton","3053"],["Hawthorn","3122"],["Toorak","3142"],["Docklands","3008"]].map(([s,p]) => (
               <option key={p} value={p}>{s} {p}</option>
@@ -171,7 +241,6 @@ export default function PlayUp() {
             <div style={{textAlign:"center",padding:"3rem",color:"#8aab72"}}>
               <div style={{fontSize:"3rem",marginBottom:"1rem"}}>🔍</div>
               <div style={{fontSize:"1rem",marginBottom:"0.5rem"}}>No lessons found for that search</div>
-              <div style={{fontSize:"0.85rem"}}>Try a different postcode, suburb or activity</div>
               <button className="btn" onClick={() => { setSearchPostcode(""); setSearchText(""); setActiveFilter("all"); }} style={{marginTop:"1rem",background:"rgba(200,241,53,0.1)",border:"1px solid rgba(200,241,53,0.2)",color:"#C8F135",borderRadius:999,padding:"0.5rem 1.2rem",fontSize:"0.85rem"}}>Clear Search</button>
             </div>
           ) : (
@@ -215,13 +284,12 @@ export default function PlayUp() {
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1}}>
               {filteredEvents.length > 0 ? `${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You` : "No Events Found"}
             </div>
-            <button className="btn" onClick={() => setModal("event")} style={{borderRadius:999,fontSize:"0.85rem",padding:"0.5rem 1.2rem",background:"#C8F135",color:"#0F1A0A",border:"none",fontWeight:700}}>+ Create Event</button>
+            <button className="btn" onClick={() => user ? setModal("event") : setModal("login")} style={{borderRadius:999,fontSize:"0.85rem",padding:"0.5rem 1.2rem",background:"#C8F135",color:"#0F1A0A",border:"none",fontWeight:700}}>+ Create Event</button>
           </div>
           {filteredEvents.length === 0 ? (
             <div style={{textAlign:"center",padding:"3rem",color:"#8aab72"}}>
               <div style={{fontSize:"3rem",marginBottom:"1rem"}}>🏃</div>
               <div style={{fontSize:"1rem",marginBottom:"0.5rem"}}>No events found for that postcode</div>
-              <div style={{fontSize:"0.85rem"}}>Try a different area or create your own event!</div>
               <button className="btn" onClick={() => setSearchPostcode("")} style={{marginTop:"1rem",background:"rgba(200,241,53,0.1)",border:"1px solid rgba(200,241,53,0.2)",color:"#C8F135",borderRadius:999,padding:"0.5rem 1.2rem",fontSize:"0.85rem"}}>Clear Search</button>
             </div>
           ) : (
@@ -236,7 +304,7 @@ export default function PlayUp() {
                     <div style={{fontSize:"2.2rem",marginBottom:"0.5rem"}}>{ev.emoji}</div>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1rem"}}>
                       <div style={{fontSize:"0.7rem",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:c}}>{ev.sport}</div>
-                      <span style={{background:`${c}18`,color:c,border:`1px solid ${c}33`,fontSize:"0.75rem",fontWeight:700,padding:"0.3rem 0.7rem",borderRadius:999,animation:spotsLeft<=2?"pulse 2s infinite":"none"}}>
+                      <span style={{background:`${c}18`,color:c,border:`1px solid ${c}33`,fontSize:"0.75rem",fontWeight:700,padding:"0.3rem 0.7rem",borderRadius:999}}>
                         {spotsLeft <= 2 ? `${spotsLeft} spot${spotsLeft===1?"":"s"} left!` : `${spotsLeft} spots`}
                       </span>
                     </div>
@@ -257,7 +325,12 @@ export default function PlayUp() {
                           </div>
                         ))}
                       </div>
-                      <button className="btn" onClick={() => { setJoinedEvents(p => [...p, ev.id]); showToast("Request sent! The host will confirm you."); }}
+                      <button className="btn"
+                        onClick={() => {
+                          if (!user) { setModal("login"); return; }
+                          setJoinedEvents(p => [...p, ev.id]);
+                          showToast("Request sent! The host will confirm you.");
+                        }}
                         disabled={joinedEvents.includes(ev.id)}
                         style={{padding:"0.5rem 1.2rem",background:joinedEvents.includes(ev.id)?"#3a5a2a":c,color:joinedEvents.includes(ev.id)?"#8aab72":"#0F1A0A",border:"none",borderRadius:999,fontWeight:700,fontSize:"0.82rem",opacity:joinedEvents.includes(ev.id)?0.7:1}}>
                         {joinedEvents.includes(ev.id) ? "Requested ✓" : "Request to Join"}
@@ -272,7 +345,7 @@ export default function PlayUp() {
       )}
 
       {/* PROVIDER BANNER */}
-      <div style={{margin:"0 2.5rem 3rem",background:"linear-gradient(135deg,#1C2E12,#0d2010)",border:"1px solid rgba(200,241,53,0.15)",borderRadius:20,padding:"2.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"2rem",flexWrap:"wrap",position:"relative",overflow:"hidden"}}>
+      <div style={{margin:"0 2.5rem 3rem",background:"linear-gradient(135deg,#1C2E12,#0d2010)",border:"1px solid rgba(200,241,53,0.15)",borderRadius:20,padding:"2.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"2rem",flexWrap:"wrap"}}>
         <div>
           <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2.2rem",letterSpacing:1,marginBottom:"0.5rem"}}>Are You a <span style={{color:"#C8F135"}}>Lesson Provider?</span></h2>
           <p style={{color:"#8aab72",fontSize:"0.9rem",maxWidth:400,lineHeight:1.6}}>List your lessons on PlayUp and reach thousands of learners across Melbourne.</p>
@@ -285,7 +358,7 @@ export default function PlayUp() {
             ))}
           </div>
         </div>
-        <button className="btn" onClick={() => setModal("provider")} style={{padding:"0.85rem 2rem",fontSize:"1rem",borderRadius:999,fontWeight:700,background:"#C8F135",color:"#0F1A0A",border:"none",whiteSpace:"nowrap"}}>List My Lessons →</button>
+        <button className="btn" onClick={() => user ? setModal("provider") : setModal("signup")} style={{padding:"0.85rem 2rem",fontSize:"1rem",borderRadius:999,fontWeight:700,background:"#C8F135",color:"#0F1A0A",border:"none",whiteSpace:"nowrap"}}>List My Lessons →</button>
       </div>
 
       {/* FOOTER */}
@@ -306,106 +379,133 @@ export default function PlayUp() {
           <div style={{background:"#1C2E12",border:"1px solid rgba(200,241,53,0.15)",borderRadius:20,padding:"2rem",width:"90%",maxWidth:480,position:"relative",animation:"slideUp 0.3s ease"}}>
             <button onClick={() => setModal(null)} style={{position:"absolute",top:"1rem",right:"1rem",background:"none",border:"none",color:"#8aab72",fontSize:"1.2rem",cursor:"pointer"}}>✕</button>
 
+            {/* LOGIN */}
             {modal === "login" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Welcome Back</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Log in to your PlayUp account</p>
-              {[["Email","email","you@email.com"],["Password","password","••••••••"]].map(([l,t,p]) => (
-                <div key={l} style={{marginBottom:"1rem"}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>{l}</label>
-                  <input type={t} placeholder={p} style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
-                </div>
-              ))}
-              <button className="btn" onClick={() => { setModal(null); showToast("You're logged in! 🎉"); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Log In</button>
+              {authError && <div style={{background:"rgba(255,100,100,0.1)",border:"1px solid rgba(255,100,100,0.3)",borderRadius:8,padding:"0.7rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#ff8080"}}>{authError}</div>}
+              <div style={{marginBottom:"1rem"}}>
+                <label style={labelStyle}>Email</label>
+                <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/>
+              </div>
+              <div style={{marginBottom:"1rem"}}>
+                <label style={labelStyle}>Password</label>
+                <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}/>
+              </div>
+              <button className="btn" onClick={handleLogin} disabled={authLoading}
+                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>
+                {authLoading ? "Logging in..." : "Log In"}
+              </button>
+              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>
+                Don't have an account?{" "}
+                <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("signup"); }}>Sign up free</span>
+              </p>
             </>}
 
+            {/* SIGNUP */}
             {modal === "signup" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Join PlayUp</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Free to sign up. Find lessons and players near you.</p>
+              {authError && <div style={{background:"rgba(255,100,100,0.1)",border:"1px solid rgba(255,100,100,0.3)",borderRadius:8,padding:"0.7rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#ff8080"}}>{authError}</div>}
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                {[["First Name","Alex"],["Last Name","Smith"]].map(([l,p]) => (
-                  <div key={l} style={{flex:1}}>
-                    <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>{l}</label>
-                    <input placeholder={p} style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
-                  </div>
-                ))}
-              </div>
-              {[["Email","email","you@email.com"],["Password","password","••••••••"]].map(([l,t,p]) => (
-                <div key={l} style={{marginBottom:"1rem"}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>{l}</label>
-                  <input type={t} placeholder={p} style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                <div style={{flex:1}}>
+                  <label style={labelStyle}>First Name</label>
+                  <input placeholder="Alex" value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle}/>
                 </div>
-              ))}
-              <button className="btn" onClick={() => { setModal(null); showToast("Welcome to PlayUp! 🎉"); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Create Free Account</button>
+                <div style={{flex:1}}>
+                  <label style={labelStyle}>Last Name</label>
+                  <input placeholder="Smith" value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle}/>
+                </div>
+              </div>
+              <div style={{marginBottom:"1rem"}}>
+                <label style={labelStyle}>Email</label>
+                <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/>
+              </div>
+              <div style={{marginBottom:"1rem"}}>
+                <label style={labelStyle}>Password</label>
+                <input type="password" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}/>
+              </div>
+              <button className="btn" onClick={handleSignup} disabled={authLoading}
+                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>
+                {authLoading ? "Creating account..." : "Create Free Account"}
+              </button>
+              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>
+                Already have an account?{" "}
+                <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("login"); }}>Log in</span>
+              </p>
             </>}
 
+            {/* PROVIDER */}
             {modal === "provider" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>List Your Lesson</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Get discovered by students in Melbourne</p>
               <div style={{marginBottom:"1rem"}}>
-                <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Your Name / Business</label>
-                <input placeholder="e.g. Sarah Mitchell Coaching" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                <label style={labelStyle}>Your Name / Business</label>
+                <input placeholder="e.g. Sarah Mitchell Coaching" style={inputStyle}/>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
                 {[["Activity Type",["Tennis","Piano","Swimming","Yoga","Guitar","Martial Arts","Other"]],["Suburb",["Richmond","Fitzroy","St Kilda","Carlton","Hawthorn","Toorak"]]].map(([l,opts]) => (
                   <div key={l as string} style={{flex:1}}>
-                    <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>{l as string}</label>
-                    <select style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}>
+                    <label style={labelStyle}>{l as string}</label>
+                    <select style={inputStyle}>
                       {(opts as string[]).map(o => <option key={o}>{o}</option>)}
                     </select>
                   </div>
                 ))}
               </div>
               <div style={{marginBottom:"1rem"}}>
-                <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Postcode</label>
-                <input placeholder="e.g. 3121" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                <label style={labelStyle}>Postcode</label>
+                <input placeholder="e.g. 3121" style={inputStyle}/>
               </div>
               <div style={{marginBottom:"1rem"}}>
-                <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>About Your Lessons</label>
-                <textarea placeholder="Describe your experience and lesson style..." style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none",resize:"vertical",minHeight:80}}/>
+                <label style={labelStyle}>About Your Lessons</label>
+                <textarea placeholder="Describe your experience and lesson style..." style={{...inputStyle,resize:"vertical",minHeight:80}}/>
               </div>
-              <button className="btn" onClick={() => { setModal(null); showToast("Your listing is under review!"); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Submit My Listing</button>
+              <button className="btn" onClick={() => { setModal(null); showToast("Your listing is under review!"); }}
+                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>
+                Submit My Listing
+              </button>
             </>}
 
+            {/* EVENT */}
             {modal === "event" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Create an Event</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Find players to join your game</p>
               <div style={{marginBottom:"1rem"}}>
-                <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Event Title</label>
-                <input placeholder="e.g. Casual soccer at Edinburgh Gardens" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                <label style={labelStyle}>Event Title</label>
+                <input placeholder="e.g. Casual soccer at Edinburgh Gardens" style={inputStyle}/>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
                 <div style={{flex:1}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Sport</label>
-                  <select style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}>
+                  <label style={labelStyle}>Sport</label>
+                  <select style={inputStyle}>
                     {["Soccer","Tennis","Basketball","Cricket","Volleyball","Badminton","Other"].map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
                 <div style={{flex:1}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Players Needed</label>
-                  <input type="number" placeholder="e.g. 4" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                  <label style={labelStyle}>Players Needed</label>
+                  <input type="number" placeholder="e.g. 4" style={inputStyle}/>
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:1}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Date</label>
-                  <input type="date" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
-                </div>
-                <div style={{flex:1}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Time</label>
-                  <input type="time" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
-                </div>
+                <div style={{flex:1}}><label style={labelStyle}>Date</label><input type="date" style={inputStyle}/></div>
+                <div style={{flex:1}}><label style={labelStyle}>Time</label><input type="time" style={inputStyle}/></div>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
                 <div style={{flex:2}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Location</label>
-                  <input placeholder="e.g. Edinburgh Gardens, Fitzroy North" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                  <label style={labelStyle}>Location</label>
+                  <input placeholder="e.g. Edinburgh Gardens, Fitzroy North" style={inputStyle}/>
                 </div>
                 <div style={{flex:1}}>
-                  <label style={{display:"block",fontSize:"0.78rem",fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:"#8aab72",marginBottom:"0.4rem"}}>Postcode</label>
-                  <input placeholder="e.g. 3068" style={{width:"100%",background:"#172510",border:"1px solid #3a5a2a",borderRadius:10,padding:"0.7rem 1rem",color:"#e8f5d8",fontSize:"0.9rem",outline:"none"}}/>
+                  <label style={labelStyle}>Postcode</label>
+                  <input placeholder="e.g. 3068" style={inputStyle}/>
                 </div>
               </div>
-              <button className="btn" onClick={() => { setModal(null); showToast("Event posted! Players will find you."); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Post My Event</button>
+              <button className="btn" onClick={() => { setModal(null); showToast("Event posted! Players will find you."); }}
+                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>
+                Post My Event
+              </button>
             </>}
           </div>
         </div>
