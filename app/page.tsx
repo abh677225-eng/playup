@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
 type User = { email: string } | null;
 
 export default function PlayUp() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"lessons"|"events">("lessons");
   const [activeFilter, setActiveFilter] = useState("all");
   const [modal, setModal] = useState<string|null>(null);
@@ -15,14 +17,11 @@ export default function PlayUp() {
   const [user, setUser] = useState<User>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
-
-  // Auth form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
-  // Check if user is already logged in
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ? { email: session.user.email! } : null);
@@ -39,35 +38,19 @@ export default function PlayUp() {
   };
 
   const handleLogin = async () => {
-    setAuthLoading(true);
-    setAuthError("");
+    setAuthLoading(true); setAuthError("");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setAuthLoading(false);
-    if (error) {
-      setAuthError(error.message);
-    } else {
-      setModal(null);
-      setEmail(""); setPassword("");
-      showToast("Welcome back! You're logged in 🎉");
-    }
+    if (error) { setAuthError(error.message); }
+    else { setModal(null); setEmail(""); setPassword(""); showToast("Welcome back! You're logged in 🎉"); }
   };
 
   const handleSignup = async () => {
-    setAuthLoading(true);
-    setAuthError("");
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { first_name: firstName, last_name: lastName } }
-    });
+    setAuthLoading(true); setAuthError("");
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { first_name: firstName, last_name: lastName } } });
     setAuthLoading(false);
-    if (error) {
-      setAuthError(error.message);
-    } else {
-      setModal(null);
-      setEmail(""); setPassword(""); setFirstName(""); setLastName("");
-      showToast("Account created! Check your email to confirm your account 📧");
-    }
+    if (error) { setAuthError(error.message); }
+    else { setModal(null); setEmail(""); setPassword(""); setFirstName(""); setLastName(""); showToast("Account created! Check your email to confirm 📧"); }
   };
 
   const handleLogout = async () => {
@@ -76,12 +59,12 @@ export default function PlayUp() {
   };
 
   const lessons = [
-    { id:1, type:"tennis", emoji:"🎾", sport:"Tennis", title:"Beginner to Intermediate Tennis Coaching", provider:"Coach Sarah Mitchell", suburb:"Richmond", postcode:"3121", price:75, rating:4.9, reviews:82, featured:true },
-    { id:2, type:"piano", emoji:"🎹", sport:"Piano", title:"Classical & Contemporary Piano for All Ages", provider:"James Okonkwo", suburb:"Carlton", postcode:"3053", price:65, rating:4.8, reviews:47, badge:"New" },
-    { id:3, type:"swimming", emoji:"🏊", sport:"Swimming", title:"Adult Learn to Swim & Stroke Correction", provider:"Melbourne Aquatics", suburb:"St Kilda", postcode:"3182", price:55, rating:4.6, reviews:103, featured:true },
-    { id:4, type:"yoga", emoji:"🧘", sport:"Yoga", title:"Morning Vinyasa Flow – All Levels Welcome", provider:"Priya Sharma", suburb:"South Yarra", postcode:"3141", price:40, rating:5.0, reviews:61 },
-    { id:5, type:"guitar", emoji:"🎸", sport:"Guitar", title:"Electric & Acoustic Guitar – Rock, Pop & Blues", provider:"Dan Caruso", suburb:"Fitzroy", postcode:"3065", price:70, rating:4.7, reviews:38 },
-    { id:6, type:"martial arts", emoji:"🥋", sport:"Martial Arts", title:"Brazilian Jiu-Jitsu – Kids & Adults Classes", provider:"Hawthorn BJJ Academy", suburb:"Hawthorn", postcode:"3122", price:60, rating:4.9, reviews:125, badge:"Popular" },
+    { id:"1", type:"tennis", emoji:"🎾", sport:"Tennis", title:"Beginner to Intermediate Tennis Coaching", provider:"Coach Sarah Mitchell", suburb:"Richmond", postcode:"3121", price:75, rating:4.9, reviews:82, featured:true },
+    { id:"2", type:"piano", emoji:"🎹", sport:"Piano", title:"Classical & Contemporary Piano for All Ages", provider:"James Okonkwo", suburb:"Carlton", postcode:"3053", price:65, rating:4.8, reviews:47, badge:"New" },
+    { id:"3", type:"swimming", emoji:"🏊", sport:"Swimming", title:"Adult Learn to Swim & Stroke Correction", provider:"Melbourne Aquatics", suburb:"St Kilda", postcode:"3182", price:55, rating:4.6, reviews:103, featured:true },
+    { id:"4", type:"yoga", emoji:"🧘", sport:"Yoga", title:"Morning Vinyasa Flow – All Levels Welcome", provider:"Priya Sharma", suburb:"South Yarra", postcode:"3141", price:40, rating:5.0, reviews:61 },
+    { id:"5", type:"guitar", emoji:"🎸", sport:"Guitar", title:"Electric & Acoustic Guitar – Rock, Pop & Blues", provider:"Dan Caruso", suburb:"Fitzroy", postcode:"3065", price:70, rating:4.7, reviews:38 },
+    { id:"6", type:"martial arts", emoji:"🥋", sport:"Martial Arts", title:"Brazilian Jiu-Jitsu – Kids & Adults Classes", provider:"Hawthorn BJJ Academy", suburb:"Hawthorn", postcode:"3122", price:60, rating:4.9, reviews:125, badge:"Popular" },
   ];
 
   const events = [
@@ -98,23 +81,12 @@ export default function PlayUp() {
   });
 
   const filteredEvents = events.filter(e => {
-    const matchesPostcode = searchPostcode === "" || e.postcode.includes(searchPostcode) || e.location.toLowerCase().includes(searchPostcode.toLowerCase());
-    return matchesPostcode;
+    return searchPostcode === "" || e.postcode.includes(searchPostcode) || e.location.toLowerCase().includes(searchPostcode.toLowerCase());
   });
 
   const colorMap: Record<string, string> = { lime:"#C8F135", orange:"#FF6B35", blue:"#35C8F1" };
-
-  const inputStyle = {
-    width:"100%", background:"#172510", border:"1px solid #3a5a2a",
-    borderRadius:10, padding:"0.7rem 1rem", color:"#e8f5d8",
-    fontSize:"0.9rem", outline:"none"
-  };
-
-  const labelStyle = {
-    display:"block" as const, fontSize:"0.78rem", fontWeight:700,
-    letterSpacing:0.8, textTransform:"uppercase" as const,
-    color:"#8aab72", marginBottom:"0.4rem"
-  };
+  const inputStyle = { width:"100%", background:"#172510", border:"1px solid #3a5a2a", borderRadius:10, padding:"0.7rem 1rem", color:"#e8f5d8", fontSize:"0.9rem", outline:"none" };
+  const labelStyle = { display:"block" as const, fontSize:"0.78rem", fontWeight:700, letterSpacing:0.8, textTransform:"uppercase" as const, color:"#8aab72", marginBottom:"0.4rem" };
 
   return (
     <>
@@ -127,19 +99,16 @@ export default function PlayUp() {
         @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+        .lesson-card:hover{transform:translateY(-3px)!important;border-color:rgba(200,241,53,0.25)!important;}
       `}</style>
 
       {/* NAV */}
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:100,background:"rgba(15,26,10,0.92)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(200,241,53,0.1)"}}>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:"#C8F135",letterSpacing:2}}>
-          Play<span style={{color:"#FF6B35"}}>Up</span>
-        </div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:"#C8F135",letterSpacing:2}}>Play<span style={{color:"#FF6B35"}}>Up</span></div>
         <div style={{display:"flex",gap:"2rem"}}>
           {["Lessons","Events"].map(t => (
             <button key={t} className="btn" onClick={() => setActiveTab(t.toLowerCase() as "lessons"|"events")}
-              style={{background:"none",border:"none",color:activeTab===t.toLowerCase()?"#C8F135":"#8aab72",fontWeight:600,fontSize:"0.9rem"}}>
-              {t}
-            </button>
+              style={{background:"none",border:"none",color:activeTab===t.toLowerCase()?"#C8F135":"#8aab72",fontWeight:600,fontSize:"0.9rem"}}>{t}</button>
           ))}
           <button className="btn" onClick={() => setModal("provider")} style={{background:"none",border:"none",color:"#8aab72",fontWeight:600,fontSize:"0.9rem"}}>List Your Lessons</button>
         </div>
@@ -162,12 +131,8 @@ export default function PlayUp() {
       <section style={{padding:"5rem 2.5rem 3rem",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",fontFamily:"'Bebas Neue',sans-serif",fontSize:"28vw",color:"rgba(200,241,53,0.03)",top:"-2rem",right:"-2rem",lineHeight:1,pointerEvents:"none",userSelect:"none"}}>PLAY</div>
         <div style={{display:"inline-block",background:"rgba(200,241,53,0.1)",color:"#C8F135",fontSize:"0.75rem",fontWeight:700,letterSpacing:2,textTransform:"uppercase",padding:"0.35rem 1rem",borderRadius:999,marginBottom:"1.5rem",border:"1px solid rgba(200,241,53,0.2)"}}>🏙️ Now in Melbourne</div>
-        <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"clamp(3.5rem,8vw,7rem)",lineHeight:0.95,marginBottom:"1.5rem",maxWidth:700}}>
-          Find Your<br/><span style={{color:"#C8F135"}}>Perfect Game</span>
-        </h1>
-        <p style={{fontSize:"1.05rem",color:"#8aab72",maxWidth:480,lineHeight:1.7,marginBottom:"2.5rem"}}>
-          Book lessons from local experts, or find people to play with. Tennis, piano, yoga, soccer — whatever your game, PlayUp connects you.
-        </p>
+        <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"clamp(3.5rem,8vw,7rem)",lineHeight:0.95,marginBottom:"1.5rem",maxWidth:700}}>Find Your<br/><span style={{color:"#C8F135"}}>Perfect Game</span></h1>
+        <p style={{fontSize:"1.05rem",color:"#8aab72",maxWidth:480,lineHeight:1.7,marginBottom:"2.5rem"}}>Book lessons from local experts, or find people to play with. Tennis, piano, yoga, soccer — whatever your game, PlayUp connects you.</p>
         <div style={{display:"flex",gap:"1rem",flexWrap:"wrap"}}>
           <button className="btn" onClick={() => setActiveTab("lessons")} style={{padding:"0.85rem 2rem",fontSize:"1rem",borderRadius:999,fontWeight:700,background:"#C8F135",color:"#0F1A0A",border:"none"}}>Find Lessons</button>
           <button className="btn" onClick={() => setActiveTab("events")} style={{padding:"0.85rem 2rem",fontSize:"1rem",borderRadius:999,fontWeight:700,background:"transparent",color:"#e8f5d8",border:"1px solid #3a5a2a"}}>Join an Event</button>
@@ -187,11 +152,9 @@ export default function PlayUp() {
       {/* SEARCH */}
       <section style={{padding:"2.5rem 2.5rem"}}>
         <div style={{display:"flex",gap:"0.5rem",background:"#172510",border:"1px solid #3a5a2a",borderRadius:16,padding:"0.6rem",maxWidth:900,flexWrap:"wrap"}}>
-          <input placeholder="Search lessons, sports, activities..." value={searchText} onChange={e => setSearchText(e.target.value)}
-            style={{flex:2,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:160}}/>
+          <input placeholder="Search lessons, sports, activities..." value={searchText} onChange={e => setSearchText(e.target.value)} style={{flex:2,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:160}}/>
           <div style={{width:1,background:"#3a5a2a",margin:"0.2rem 0"}}/>
-          <input placeholder="Postcode or suburb..." value={searchPostcode} onChange={e => setSearchPostcode(e.target.value)}
-            style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:140}}/>
+          <input placeholder="Postcode or suburb..." value={searchPostcode} onChange={e => setSearchPostcode(e.target.value)} style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#e8f5d8",fontSize:"0.95rem",padding:"0.4rem 0.8rem",minWidth:140}}/>
           <div style={{width:1,background:"#3a5a2a",margin:"0.2rem 0"}}/>
           <select style={{background:"transparent",border:"none",outline:"none",color:"#8aab72",fontSize:"0.9rem",padding:"0.4rem 0.8rem",cursor:"pointer"}} onChange={e => setSearchPostcode(e.target.value)}>
             <option value="">All Melbourne</option>
@@ -232,9 +195,7 @@ export default function PlayUp() {
       {activeTab === "lessons" && (
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1}}>
-              {filtered.length > 0 ? `${filtered.length} Lesson${filtered.length===1?"":"s"} Found` : "No Lessons Found"}
-            </div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1}}>{filtered.length > 0 ? `${filtered.length} Lesson${filtered.length===1?"":"s"} Found` : "No Lessons Found"}</div>
             <span style={{fontSize:"0.85rem",color:"#C8F135",cursor:"pointer",fontWeight:600}}>See all →</span>
           </div>
           {filtered.length === 0 ? (
@@ -246,9 +207,9 @@ export default function PlayUp() {
           ) : (
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"1.2rem"}}>
               {filtered.map((l,i) => (
-                <div key={l.id} style={{background:"#172510",borderRadius:16,overflow:"hidden",border:"1px solid rgba(200,241,53,0.07)",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s"}}
-                  onMouseEnter={e => {(e.currentTarget as HTMLDivElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLDivElement).style.borderColor="rgba(200,241,53,0.25)";}}
-                  onMouseLeave={e => {(e.currentTarget as HTMLDivElement).style.transform="translateY(0)";(e.currentTarget as HTMLDivElement).style.borderColor="rgba(200,241,53,0.07)";}}>
+                <div key={l.id} className="lesson-card"
+                  onClick={() => router.push(`/lessons/${l.id}`)}
+                  style={{background:"#172510",borderRadius:16,overflow:"hidden",border:"1px solid rgba(200,241,53,0.07)",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s"}}>
                   <div style={{height:160,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"4rem",position:"relative",background:`linear-gradient(135deg, #1a2a1a, #2a4a2a)`}}>
                     {l.emoji}
                     {(l.featured || l.badge) && (
@@ -269,6 +230,7 @@ export default function PlayUp() {
                       <span style={{color:"#FFB800"}}>{"★".repeat(Math.floor(l.rating))}{"☆".repeat(5-Math.floor(l.rating))}</span>
                       {l.rating} ({l.reviews} reviews)
                     </div>
+                    <div style={{marginTop:"0.8rem",fontSize:"0.8rem",color:"#C8F135",fontWeight:600}}>View Details →</div>
                   </div>
                 </div>
               ))}
@@ -281,9 +243,7 @@ export default function PlayUp() {
       {activeTab === "events" && (
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1}}>
-              {filteredEvents.length > 0 ? `${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You` : "No Events Found"}
-            </div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1}}>{filteredEvents.length > 0 ? `${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You` : "No Events Found"}</div>
             <button className="btn" onClick={() => user ? setModal("event") : setModal("login")} style={{borderRadius:999,fontSize:"0.85rem",padding:"0.5rem 1.2rem",background:"#C8F135",color:"#0F1A0A",border:"none",fontWeight:700}}>+ Create Event</button>
           </div>
           {filteredEvents.length === 0 ? (
@@ -325,12 +285,7 @@ export default function PlayUp() {
                           </div>
                         ))}
                       </div>
-                      <button className="btn"
-                        onClick={() => {
-                          if (!user) { setModal("login"); return; }
-                          setJoinedEvents(p => [...p, ev.id]);
-                          showToast("Request sent! The host will confirm you.");
-                        }}
+                      <button className="btn" onClick={() => { if(!user){setModal("login");return;} setJoinedEvents(p=>[...p,ev.id]); showToast("Request sent! The host will confirm you."); }}
                         disabled={joinedEvents.includes(ev.id)}
                         style={{padding:"0.5rem 1.2rem",background:joinedEvents.includes(ev.id)?"#3a5a2a":c,color:joinedEvents.includes(ev.id)?"#8aab72":"#0F1A0A",border:"none",borderRadius:999,fontWeight:700,fontSize:"0.82rem",opacity:joinedEvents.includes(ev.id)?0.7:1}}>
                         {joinedEvents.includes(ev.id) ? "Requested ✓" : "Request to Join"}
@@ -379,143 +334,68 @@ export default function PlayUp() {
           <div style={{background:"#1C2E12",border:"1px solid rgba(200,241,53,0.15)",borderRadius:20,padding:"2rem",width:"90%",maxWidth:480,position:"relative",animation:"slideUp 0.3s ease"}}>
             <button onClick={() => setModal(null)} style={{position:"absolute",top:"1rem",right:"1rem",background:"none",border:"none",color:"#8aab72",fontSize:"1.2rem",cursor:"pointer"}}>✕</button>
 
-            {/* LOGIN */}
             {modal === "login" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Welcome Back</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Log in to your PlayUp account</p>
               {authError && <div style={{background:"rgba(255,100,100,0.1)",border:"1px solid rgba(255,100,100,0.3)",borderRadius:8,padding:"0.7rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#ff8080"}}>{authError}</div>}
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Email</label>
-                <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/>
-              </div>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Password</label>
-                <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
-                  onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-              </div>
-              <button className="btn" onClick={handleLogin} disabled={authLoading}
-                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>
-                {authLoading ? "Logging in..." : "Log In"}
-              </button>
-              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>
-                Don't have an account?{" "}
-                <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("signup"); }}>Sign up free</span>
-              </p>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Email</label><input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/></div>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Password</label><input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==="Enter" && handleLogin()} style={inputStyle}/></div>
+              <button className="btn" onClick={handleLogin} disabled={authLoading} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>{authLoading ? "Logging in..." : "Log In"}</button>
+              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>Don't have an account? <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("signup"); }}>Sign up free</span></p>
             </>}
 
-            {/* SIGNUP */}
             {modal === "signup" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Join PlayUp</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Free to sign up. Find lessons and players near you.</p>
               {authError && <div style={{background:"rgba(255,100,100,0.1)",border:"1px solid rgba(255,100,100,0.3)",borderRadius:8,padding:"0.7rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#ff8080"}}>{authError}</div>}
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:1}}>
-                  <label style={labelStyle}>First Name</label>
-                  <input placeholder="Alex" value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle}/>
-                </div>
-                <div style={{flex:1}}>
-                  <label style={labelStyle}>Last Name</label>
-                  <input placeholder="Smith" value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle}/>
-                </div>
+                <div style={{flex:1}}><label style={labelStyle}>First Name</label><input placeholder="Alex" value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle}/></div>
+                <div style={{flex:1}}><label style={labelStyle}>Last Name</label><input placeholder="Smith" value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle}/></div>
               </div>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Email</label>
-                <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/>
-              </div>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Password</label>
-                <input type="password" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}/>
-              </div>
-              <button className="btn" onClick={handleSignup} disabled={authLoading}
-                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>
-                {authLoading ? "Creating account..." : "Create Free Account"}
-              </button>
-              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>
-                Already have an account?{" "}
-                <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("login"); }}>Log in</span>
-              </p>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Email</label><input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}/></div>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Password</label><input type="password" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}/></div>
+              <button className="btn" onClick={handleSignup} disabled={authLoading} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem",opacity:authLoading?0.7:1}}>{authLoading ? "Creating account..." : "Create Free Account"}</button>
+              <p style={{textAlign:"center",marginTop:"1rem",fontSize:"0.85rem",color:"#8aab72"}}>Already have an account? <span style={{color:"#C8F135",cursor:"pointer"}} onClick={() => { setAuthError(""); setModal("login"); }}>Log in</span></p>
             </>}
 
-            {/* PROVIDER */}
             {modal === "provider" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>List Your Lesson</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Get discovered by students in Melbourne</p>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Your Name / Business</label>
-                <input placeholder="e.g. Sarah Mitchell Coaching" style={inputStyle}/>
-              </div>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Your Name / Business</label><input placeholder="e.g. Sarah Mitchell Coaching" style={inputStyle}/></div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
                 {[["Activity Type",["Tennis","Piano","Swimming","Yoga","Guitar","Martial Arts","Other"]],["Suburb",["Richmond","Fitzroy","St Kilda","Carlton","Hawthorn","Toorak"]]].map(([l,opts]) => (
-                  <div key={l as string} style={{flex:1}}>
-                    <label style={labelStyle}>{l as string}</label>
-                    <select style={inputStyle}>
-                      {(opts as string[]).map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </div>
+                  <div key={l as string} style={{flex:1}}><label style={labelStyle}>{l as string}</label><select style={inputStyle}>{(opts as string[]).map(o => <option key={o}>{o}</option>)}</select></div>
                 ))}
               </div>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Postcode</label>
-                <input placeholder="e.g. 3121" style={inputStyle}/>
-              </div>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>About Your Lessons</label>
-                <textarea placeholder="Describe your experience and lesson style..." style={{...inputStyle,resize:"vertical",minHeight:80}}/>
-              </div>
-              <button className="btn" onClick={() => { setModal(null); showToast("Your listing is under review!"); }}
-                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>
-                Submit My Listing
-              </button>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Postcode</label><input placeholder="e.g. 3121" style={inputStyle}/></div>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>About Your Lessons</label><textarea placeholder="Describe your experience and lesson style..." style={{...inputStyle,resize:"vertical" as const,minHeight:80}}/></div>
+              <button className="btn" onClick={() => { setModal(null); showToast("Your listing is under review!"); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Submit My Listing</button>
             </>}
 
-            {/* EVENT */}
             {modal === "event" && <>
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem"}}>Create an Event</h3>
               <p style={{color:"#8aab72",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Find players to join your game</p>
-              <div style={{marginBottom:"1rem"}}>
-                <label style={labelStyle}>Event Title</label>
-                <input placeholder="e.g. Casual soccer at Edinburgh Gardens" style={inputStyle}/>
-              </div>
+              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Event Title</label><input placeholder="e.g. Casual soccer at Edinburgh Gardens" style={inputStyle}/></div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:1}}>
-                  <label style={labelStyle}>Sport</label>
-                  <select style={inputStyle}>
-                    {["Soccer","Tennis","Basketball","Cricket","Volleyball","Badminton","Other"].map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div style={{flex:1}}>
-                  <label style={labelStyle}>Players Needed</label>
-                  <input type="number" placeholder="e.g. 4" style={inputStyle}/>
-                </div>
+                <div style={{flex:1}}><label style={labelStyle}>Sport</label><select style={inputStyle}>{["Soccer","Tennis","Basketball","Cricket","Volleyball","Badminton","Other"].map(o => <option key={o}>{o}</option>)}</select></div>
+                <div style={{flex:1}}><label style={labelStyle}>Players Needed</label><input type="number" placeholder="e.g. 4" style={inputStyle}/></div>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
                 <div style={{flex:1}}><label style={labelStyle}>Date</label><input type="date" style={inputStyle}/></div>
                 <div style={{flex:1}}><label style={labelStyle}>Time</label><input type="time" style={inputStyle}/></div>
               </div>
               <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:2}}>
-                  <label style={labelStyle}>Location</label>
-                  <input placeholder="e.g. Edinburgh Gardens, Fitzroy North" style={inputStyle}/>
-                </div>
-                <div style={{flex:1}}>
-                  <label style={labelStyle}>Postcode</label>
-                  <input placeholder="e.g. 3068" style={inputStyle}/>
-                </div>
+                <div style={{flex:2}}><label style={labelStyle}>Location</label><input placeholder="e.g. Edinburgh Gardens, Fitzroy North" style={inputStyle}/></div>
+                <div style={{flex:1}}><label style={labelStyle}>Postcode</label><input placeholder="e.g. 3068" style={inputStyle}/></div>
               </div>
-              <button className="btn" onClick={() => { setModal(null); showToast("Event posted! Players will find you."); }}
-                style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>
-                Post My Event
-              </button>
+              <button className="btn" onClick={() => { setModal(null); showToast("Event posted! Players will find you."); }} style={{width:"100%",padding:"0.85rem",background:"#C8F135",color:"#0F1A0A",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Post My Event</button>
             </>}
           </div>
         </div>
       )}
 
-      {/* TOAST */}
       {toast && (
-        <div style={{position:"fixed",bottom:"2rem",right:"2rem",background:"#C8F135",color:"#0F1A0A",padding:"0.8rem 1.5rem",borderRadius:12,fontWeight:700,fontSize:"0.9rem",zIndex:2000,animation:"slideUp 0.3s ease"}}>
-          {toast}
-        </div>
+        <div style={{position:"fixed",bottom:"2rem",right:"2rem",background:"#C8F135",color:"#0F1A0A",padding:"0.8rem 1.5rem",borderRadius:12,fontWeight:700,fontSize:"0.9rem",zIndex:2000,animation:"slideUp 0.3s ease"}}>{toast}</div>
       )}
     </>
   );
