@@ -117,6 +117,7 @@ export default function PlayUp() {
     { id:"sample-6", type:"martial arts", emoji:"🥋", sport:"Martial Arts", title:"Brazilian Jiu-Jitsu – Kids & Adults Classes", provider:"Hawthorn BJJ Academy", suburb:"Hawthorn", postcode:"3122", price:60, rating:4.9, reviews:125, badge:"Popular", isDb:false },
   ];
 
+  console.log("DB listings count:", dbListings.length, "listings:", dbListings);
   const dbLessonsFormatted = dbListings.map(l => {
     const suburbs = getSuburbs(l.suburbs);
     const firstSuburb = suburbs[0] || {};

@@ -143,8 +143,10 @@ export default function ProviderCreate() {
       if (error) throw error;
       setSubmitted(true);
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-    } finally {
+  const msg = err instanceof Error ? err.message : JSON.stringify(err);
+  console.error("Submit error:", err);
+  setSubmitError(msg);
+} finally {
       setSubmitting(false);
     }
   };
