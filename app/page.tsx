@@ -11,7 +11,6 @@ export default function PlayUp() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [modal, setModal] = useState<string|null>(null);
   const [toast, setToast] = useState("");
-  const [joinedEvents, setJoinedEvents] = useState<number[]>([]);
   const [searchText, setSearchText] = useState("");
   const [searchPostcode, setSearchPostcode] = useState("");
   const [user, setUser] = useState<User>(null);
@@ -68,9 +67,9 @@ export default function PlayUp() {
   ];
 
   const events = [
-    { id:1, emoji:"⚽", sport:"Soccer", title:"Casual 7-a-Side Soccer – Weekend Kick Around", host:"Marcus T.", location:"Edinburgh Gardens, Fitzroy North", postcode:"3068", date:"Saturday 22 Mar, 9:00 AM", joined:5, total:7, cost:"Free", color:"lime" },
-    { id:2, emoji:"🎾", sport:"Tennis", title:"Doubles Tennis – Intermediate Level Players", host:"Anika R.", location:"Burnley Tennis Club, Richmond", postcode:"3121", date:"Sunday 23 Mar, 7:30 AM", joined:1, total:4, cost:"$10 court split", color:"orange" },
-    { id:3, emoji:"🏀", sport:"Basketball", title:"3-on-3 Street Basketball – All Welcome", host:"Dev P.", location:"Docklands Basketball Courts", postcode:"3008", date:"Saturday 22 Mar, 3:00 PM", joined:1, total:6, cost:"Free", color:"blue" },
+    { id:"1", emoji:"⚽", sport:"Soccer", title:"Casual 7-a-Side Soccer – Weekend Kick Around", host:"Marcus T.", location:"Edinburgh Gardens, Fitzroy North", postcode:"3068", date:"Saturday 22 Mar, 9:00 AM", joined:5, total:7, cost:"Free", color:"lime" },
+    { id:"2", emoji:"🎾", sport:"Tennis", title:"Doubles Tennis – Intermediate Level Players", host:"Anika R.", location:"Burnley Tennis Club, Richmond", postcode:"3121", date:"Sunday 23 Mar, 7:30 AM", joined:1, total:4, cost:"$10 court split", color:"orange" },
+    { id:"3", emoji:"🏀", sport:"Basketball", title:"3-on-3 Street Basketball – All Welcome", host:"Dev P.", location:"Docklands Basketball Courts", postcode:"3008", date:"Saturday 22 Mar, 3:00 PM", joined:1, total:6, cost:"Free", color:"blue" },
   ];
 
   const filtered = lessons.filter(l => {
@@ -100,6 +99,7 @@ export default function PlayUp() {
         @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
         .lesson-card:hover{transform:translateY(-3px)!important;border-color:rgba(200,241,53,0.25)!important;}
+        .event-card:hover{transform:translateY(-2px)!important;}
       `}</style>
 
       {/* NAV */}
@@ -258,9 +258,9 @@ export default function PlayUp() {
                 const c = colorMap[ev.color];
                 const spotsLeft = ev.total - ev.joined;
                 return (
-                  <div key={ev.id} style={{background:"#172510",borderRadius:16,padding:"1.4rem",border:"1px solid rgba(200,241,53,0.07)",cursor:"pointer",position:"relative",overflow:"hidden",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",borderTop:`3px solid ${c}`}}
-                    onMouseEnter={e => {(e.currentTarget as HTMLDivElement).style.transform="translateY(-2px)";}}
-                    onMouseLeave={e => {(e.currentTarget as HTMLDivElement).style.transform="translateY(0)";}}>
+                  <div key={ev.id} className="event-card"
+                    onClick={() => router.push(`/events/${ev.id}`)}
+                    style={{background:"#172510",borderRadius:16,padding:"1.4rem",border:"1px solid rgba(200,241,53,0.07)",cursor:"pointer",position:"relative",overflow:"hidden",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",borderTop:`3px solid ${c}`}}>
                     <div style={{fontSize:"2.2rem",marginBottom:"0.5rem"}}>{ev.emoji}</div>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1rem"}}>
                       <div style={{fontSize:"0.7rem",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:c}}>{ev.sport}</div>
@@ -277,20 +277,7 @@ export default function PlayUp() {
                         </div>
                       ))}
                     </div>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                      <div style={{display:"flex"}}>
-                        {["#C8F135","#FF6B35","#35C8F1","#F135C8"].slice(0,Math.min(ev.joined,4)).map((bg,j) => (
-                          <div key={j} style={{width:28,height:28,borderRadius:"50%",border:"2px solid #172510",marginLeft:j===0?0:-8,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.65rem",fontWeight:700,color:"#0F1A0A"}}>
-                            {ev.host.split(" ").map((w:string)=>w[0]).join("").slice(0,2)}
-                          </div>
-                        ))}
-                      </div>
-                      <button className="btn" onClick={() => { if(!user){setModal("login");return;} setJoinedEvents(p=>[...p,ev.id]); showToast("Request sent! The host will confirm you."); }}
-                        disabled={joinedEvents.includes(ev.id)}
-                        style={{padding:"0.5rem 1.2rem",background:joinedEvents.includes(ev.id)?"#3a5a2a":c,color:joinedEvents.includes(ev.id)?"#8aab72":"#0F1A0A",border:"none",borderRadius:999,fontWeight:700,fontSize:"0.82rem",opacity:joinedEvents.includes(ev.id)?0.7:1}}>
-                        {joinedEvents.includes(ev.id) ? "Requested ✓" : "Request to Join"}
-                      </button>
-                    </div>
+                    <div style={{fontSize:"0.8rem",color:c,fontWeight:600}}>View Details →</div>
                   </div>
                 );
               })}
