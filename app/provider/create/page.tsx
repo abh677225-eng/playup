@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 
-type User = { email: string } | null;
+type User = { id: string; email: string } | null;
 
 const ACTIVITY_TYPES = [
   "Archery","Art & Drawing","Athletics","Badminton","Ballet","Baseball","Basketball",
@@ -17,24 +17,15 @@ const ACTIVITY_TYPES = [
 ];
 
 const SUBURBS: { name: string; postcode: string; state: string; city: string }[] = [
-  // VIC - Melbourne
-  {name:"Abbotsford",postcode:"3067",state:"VIC",city:"Melbourne"},{name:"Albert Park",postcode:"3206",state:"VIC",city:"Melbourne"},{name:"Ascot Vale",postcode:"3032",state:"VIC",city:"Melbourne"},{name:"Balwyn",postcode:"3103",state:"VIC",city:"Melbourne"},{name:"Box Hill",postcode:"3128",state:"VIC",city:"Melbourne"},{name:"Brighton",postcode:"3186",state:"VIC",city:"Melbourne"},{name:"Brunswick",postcode:"3056",state:"VIC",city:"Melbourne"},{name:"Carlton",postcode:"3053",state:"VIC",city:"Melbourne"},{name:"Carnegie",postcode:"3163",state:"VIC",city:"Melbourne"},{name:"Caulfield",postcode:"3162",state:"VIC",city:"Melbourne"},{name:"CBD",postcode:"3000",state:"VIC",city:"Melbourne"},{name:"Coburg",postcode:"3058",state:"VIC",city:"Melbourne"},{name:"Collingwood",postcode:"3066",state:"VIC",city:"Melbourne"},{name:"Docklands",postcode:"3008",state:"VIC",city:"Melbourne"},{name:"Elsternwick",postcode:"3185",state:"VIC",city:"Melbourne"},{name:"Fitzroy",postcode:"3065",state:"VIC",city:"Melbourne"},{name:"Footscray",postcode:"3011",state:"VIC",city:"Melbourne"},{name:"Glen Iris",postcode:"3146",state:"VIC",city:"Melbourne"},{name:"Glen Waverley",postcode:"3150",state:"VIC",city:"Melbourne"},{name:"Hawthorn",postcode:"3122",state:"VIC",city:"Melbourne"},{name:"Kew",postcode:"3101",state:"VIC",city:"Melbourne"},{name:"Malvern",postcode:"3144",state:"VIC",city:"Melbourne"},{name:"Melbourne CBD",postcode:"3000",state:"VIC",city:"Melbourne"},{name:"Moonee Ponds",postcode:"3039",state:"VIC",city:"Melbourne"},{name:"Mordialloc",postcode:"3195",state:"VIC",city:"Melbourne"},{name:"Northcote",postcode:"3070",state:"VIC",city:"Melbourne"},{name:"Oakleigh",postcode:"3166",state:"VIC",city:"Melbourne"},{name:"Port Melbourne",postcode:"3207",state:"VIC",city:"Melbourne"},{name:"Prahran",postcode:"3181",state:"VIC",city:"Melbourne"},{name:"Richmond",postcode:"3121",state:"VIC",city:"Melbourne"},{name:"South Melbourne",postcode:"3205",state:"VIC",city:"Melbourne"},{name:"South Yarra",postcode:"3141",state:"VIC",city:"Melbourne"},{name:"Southbank",postcode:"3006",state:"VIC",city:"Melbourne"},{name:"St Kilda",postcode:"3182",state:"VIC",city:"Melbourne"},{name:"Sunshine",postcode:"3020",state:"VIC",city:"Melbourne"},{name:"Toorak",postcode:"3142",state:"VIC",city:"Melbourne"},{name:"West Melbourne",postcode:"3003",state:"VIC",city:"Melbourne"},{name:"Williamstown",postcode:"3016",state:"VIC",city:"Melbourne"},{name:"Windsor",postcode:"3181",state:"VIC",city:"Melbourne"},
-  // NSW - Sydney
-  {name:"Bondi",postcode:"2026",state:"NSW",city:"Sydney"},{name:"Bondi Junction",postcode:"2022",state:"NSW",city:"Sydney"},{name:"CBD",postcode:"2000",state:"NSW",city:"Sydney"},{name:"Chatswood",postcode:"2067",state:"NSW",city:"Sydney"},{name:"Coogee",postcode:"2034",state:"NSW",city:"Sydney"},{name:"Darlinghurst",postcode:"2010",state:"NSW",city:"Sydney"},{name:"Double Bay",postcode:"2028",state:"NSW",city:"Sydney"},{name:"Glebe",postcode:"2037",state:"NSW",city:"Sydney"},{name:"Manly",postcode:"2095",state:"NSW",city:"Sydney"},{name:"Newtown",postcode:"2042",state:"NSW",city:"Sydney"},{name:"North Sydney",postcode:"2060",state:"NSW",city:"Sydney"},{name:"Parramatta",postcode:"2150",state:"NSW",city:"Sydney"},{name:"Pyrmont",postcode:"2009",state:"NSW",city:"Sydney"},{name:"Redfern",postcode:"2016",state:"NSW",city:"Sydney"},{name:"Surry Hills",postcode:"2010",state:"NSW",city:"Sydney"},{name:"Sydney CBD",postcode:"2000",state:"NSW",city:"Sydney"},{name:"Ultimo",postcode:"2007",state:"NSW",city:"Sydney"},
-  // QLD - Brisbane
-  {name:"Brisbane CBD",postcode:"4000",state:"QLD",city:"Brisbane"},{name:"Fortitude Valley",postcode:"4006",state:"QLD",city:"Brisbane"},{name:"New Farm",postcode:"4005",state:"QLD",city:"Brisbane"},{name:"Newstead",postcode:"4006",state:"QLD",city:"Brisbane"},{name:"South Brisbane",postcode:"4101",state:"QLD",city:"Brisbane"},{name:"Spring Hill",postcode:"4000",state:"QLD",city:"Brisbane"},{name:"West End",postcode:"4101",state:"QLD",city:"Brisbane"},{name:"Woolloongabba",postcode:"4102",state:"QLD",city:"Brisbane"},
-  // QLD - Gold Coast
-  {name:"Broadbeach",postcode:"4218",state:"QLD",city:"Gold Coast"},{name:"Burleigh Heads",postcode:"4220",state:"QLD",city:"Gold Coast"},{name:"Coolangatta",postcode:"4225",state:"QLD",city:"Gold Coast"},{name:"Southport",postcode:"4215",state:"QLD",city:"Gold Coast"},{name:"Surfers Paradise",postcode:"4217",state:"QLD",city:"Gold Coast"},
-  // SA - Adelaide
-  {name:"Adelaide CBD",postcode:"5000",state:"SA",city:"Adelaide"},{name:"Glenelg",postcode:"5045",state:"SA",city:"Adelaide"},{name:"North Adelaide",postcode:"5006",state:"SA",city:"Adelaide"},{name:"Norwood",postcode:"5067",state:"SA",city:"Adelaide"},{name:"Unley",postcode:"5061",state:"SA",city:"Adelaide"},
-  // WA - Perth
+  {name:"Abbotsford",postcode:"3067",state:"VIC",city:"Melbourne"},{name:"Albert Park",postcode:"3206",state:"VIC",city:"Melbourne"},{name:"Ascot Vale",postcode:"3032",state:"VIC",city:"Melbourne"},{name:"Balwyn",postcode:"3103",state:"VIC",city:"Melbourne"},{name:"Box Hill",postcode:"3128",state:"VIC",city:"Melbourne"},{name:"Brighton",postcode:"3186",state:"VIC",city:"Melbourne"},{name:"Brunswick",postcode:"3056",state:"VIC",city:"Melbourne"},{name:"Carlton",postcode:"3053",state:"VIC",city:"Melbourne"},{name:"Carnegie",postcode:"3163",state:"VIC",city:"Melbourne"},{name:"Caulfield",postcode:"3162",state:"VIC",city:"Melbourne"},{name:"Coburg",postcode:"3058",state:"VIC",city:"Melbourne"},{name:"Collingwood",postcode:"3066",state:"VIC",city:"Melbourne"},{name:"Docklands",postcode:"3008",state:"VIC",city:"Melbourne"},{name:"Elsternwick",postcode:"3185",state:"VIC",city:"Melbourne"},{name:"Fitzroy",postcode:"3065",state:"VIC",city:"Melbourne"},{name:"Footscray",postcode:"3011",state:"VIC",city:"Melbourne"},{name:"Glen Iris",postcode:"3146",state:"VIC",city:"Melbourne"},{name:"Glen Waverley",postcode:"3150",state:"VIC",city:"Melbourne"},{name:"Hawthorn",postcode:"3122",state:"VIC",city:"Melbourne"},{name:"Kew",postcode:"3101",state:"VIC",city:"Melbourne"},{name:"Malvern",postcode:"3144",state:"VIC",city:"Melbourne"},{name:"Melbourne CBD",postcode:"3000",state:"VIC",city:"Melbourne"},{name:"Moonee Ponds",postcode:"3039",state:"VIC",city:"Melbourne"},{name:"Mordialloc",postcode:"3195",state:"VIC",city:"Melbourne"},{name:"Northcote",postcode:"3070",state:"VIC",city:"Melbourne"},{name:"Oakleigh",postcode:"3166",state:"VIC",city:"Melbourne"},{name:"Port Melbourne",postcode:"3207",state:"VIC",city:"Melbourne"},{name:"Prahran",postcode:"3181",state:"VIC",city:"Melbourne"},{name:"Richmond",postcode:"3121",state:"VIC",city:"Melbourne"},{name:"South Melbourne",postcode:"3205",state:"VIC",city:"Melbourne"},{name:"South Yarra",postcode:"3141",state:"VIC",city:"Melbourne"},{name:"Southbank",postcode:"3006",state:"VIC",city:"Melbourne"},{name:"St Kilda",postcode:"3182",state:"VIC",city:"Melbourne"},{name:"Sunshine",postcode:"3020",state:"VIC",city:"Melbourne"},{name:"Toorak",postcode:"3142",state:"VIC",city:"Melbourne"},{name:"West Melbourne",postcode:"3003",state:"VIC",city:"Melbourne"},{name:"Williamstown",postcode:"3016",state:"VIC",city:"Melbourne"},{name:"Windsor",postcode:"3181",state:"VIC",city:"Melbourne"},
+  {name:"Bondi",postcode:"2026",state:"NSW",city:"Sydney"},{name:"Bondi Junction",postcode:"2022",state:"NSW",city:"Sydney"},{name:"Chatswood",postcode:"2067",state:"NSW",city:"Sydney"},{name:"Coogee",postcode:"2034",state:"NSW",city:"Sydney"},{name:"Darlinghurst",postcode:"2010",state:"NSW",city:"Sydney"},{name:"Double Bay",postcode:"2028",state:"NSW",city:"Sydney"},{name:"Glebe",postcode:"2037",state:"NSW",city:"Sydney"},{name:"Manly",postcode:"2095",state:"NSW",city:"Sydney"},{name:"Newtown",postcode:"2042",state:"NSW",city:"Sydney"},{name:"North Sydney",postcode:"2060",state:"NSW",city:"Sydney"},{name:"Parramatta",postcode:"2150",state:"NSW",city:"Sydney"},{name:"Pyrmont",postcode:"2009",state:"NSW",city:"Sydney"},{name:"Redfern",postcode:"2016",state:"NSW",city:"Sydney"},{name:"Surry Hills",postcode:"2010",state:"NSW",city:"Sydney"},{name:"Sydney CBD",postcode:"2000",state:"NSW",city:"Sydney"},
+  {name:"Brisbane CBD",postcode:"4000",state:"QLD",city:"Brisbane"},{name:"Fortitude Valley",postcode:"4006",state:"QLD",city:"Brisbane"},{name:"New Farm",postcode:"4005",state:"QLD",city:"Brisbane"},{name:"South Brisbane",postcode:"4101",state:"QLD",city:"Brisbane"},{name:"West End",postcode:"4101",state:"QLD",city:"Brisbane"},
+  {name:"Broadbeach",postcode:"4218",state:"QLD",city:"Gold Coast"},{name:"Burleigh Heads",postcode:"4220",state:"QLD",city:"Gold Coast"},{name:"Surfers Paradise",postcode:"4217",state:"QLD",city:"Gold Coast"},
+  {name:"Adelaide CBD",postcode:"5000",state:"SA",city:"Adelaide"},{name:"Glenelg",postcode:"5045",state:"SA",city:"Adelaide"},{name:"North Adelaide",postcode:"5006",state:"SA",city:"Adelaide"},{name:"Norwood",postcode:"5067",state:"SA",city:"Adelaide"},
   {name:"Fremantle",postcode:"6160",state:"WA",city:"Perth"},{name:"Leederville",postcode:"6007",state:"WA",city:"Perth"},{name:"Northbridge",postcode:"6003",state:"WA",city:"Perth"},{name:"Perth CBD",postcode:"6000",state:"WA",city:"Perth"},{name:"Subiaco",postcode:"6008",state:"WA",city:"Perth"},
-  // ACT
-  {name:"Barton",postcode:"2600",state:"ACT",city:"Canberra"},{name:"Braddon",postcode:"2612",state:"ACT",city:"Canberra"},{name:"Canberra CBD",postcode:"2601",state:"ACT",city:"Canberra"},{name:"Dickson",postcode:"2602",state:"ACT",city:"Canberra"},{name:"Manuka",postcode:"2603",state:"ACT",city:"Canberra"},
-  // TAS
-  {name:"Hobart CBD",postcode:"7000",state:"TAS",city:"Hobart"},{name:"Sandy Bay",postcode:"7005",state:"TAS",city:"Hobart"},{name:"West Hobart",postcode:"7000",state:"TAS",city:"Hobart"},
-  // NT
-  {name:"Darwin CBD",postcode:"0800",state:"NT",city:"Darwin"},{name:"Parap",postcode:"0820",state:"NT",city:"Darwin"},{name:"Stuart Park",postcode:"0820",state:"NT",city:"Darwin"},
+  {name:"Canberra CBD",postcode:"2601",state:"ACT",city:"Canberra"},{name:"Braddon",postcode:"2612",state:"ACT",city:"Canberra"},{name:"Manuka",postcode:"2603",state:"ACT",city:"Canberra"},
+  {name:"Hobart CBD",postcode:"7000",state:"TAS",city:"Hobart"},{name:"Sandy Bay",postcode:"7005",state:"TAS",city:"Hobart"},
+  {name:"Darwin CBD",postcode:"0800",state:"NT",city:"Darwin"},{name:"Parap",postcode:"0820",state:"NT",city:"Darwin"},
 ];
 
 const MAX_SUBURBS = 10;
@@ -43,8 +34,8 @@ export default function ProviderCreate() {
   const router = useRouter();
   const [user, setUser] = useState<User>(null);
   const [submitted, setSubmitted] = useState(false);
-
-  // Form fields
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [providerName, setProviderName] = useState("");
   const [activitySearch, setActivitySearch] = useState("");
   const [activityType, setActivityType] = useState("");
@@ -56,24 +47,24 @@ export default function ProviderCreate() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [suburbSearch, setSuburbSearch] = useState("");
-  const [selectedSuburbs, setSelectedSuburbs] = useState<{name:string;postcode:string;state:string;city:string}[]>([]);
+  const [selectedSuburbs, setSelectedSuburbs] = useState<typeof SUBURBS>([]);
   const [showSuburbDropdown, setShowSuburbDropdown] = useState(false);
   const [onlineAvailable, setOnlineAvailable] = useState(false);
   const [price, setPrice] = useState("");
   const [sessionDuration, setSessionDuration] = useState("60");
   const [lessonType, setLessonType] = useState("Private");
   const [errors, setErrors] = useState<Record<string,string>>({});
-
   const activityRef = useRef<HTMLDivElement>(null);
   const suburbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? { email: session.user.email! } : null);
+      if (session?.user) {
+        setUser({ id: session.user.id, email: session.user.email! });
+      } else {
+        router.push("/");
+      }
     });
-  }, []);
-
-  useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (activityRef.current && !activityRef.current.contains(e.target as Node)) setShowActivityDropdown(false);
       if (suburbRef.current && !suburbRef.current.contains(e.target as Node)) setShowSuburbDropdown(false);
@@ -93,12 +84,12 @@ export default function ProviderCreate() {
   }).slice(0, 20);
 
   const filteredActivities = ACTIVITY_TYPES.filter(a => a.toLowerCase().includes(activitySearch.toLowerCase()));
-
   const selectActivity = (a: string) => { setActivityType(a); setActivitySearch(a); setShowActivityDropdown(false); };
   const addSuburb = (s: typeof SUBURBS[0]) => {
     if (selectedSuburbs.length >= MAX_SUBURBS) return;
     setSelectedSuburbs(prev => [...prev, s]);
     setSuburbSearch("");
+    setShowSuburbDropdown(false);
   };
   const removeSuburb = (idx: number) => setSelectedSuburbs(prev => prev.filter((_,i) => i !== idx));
 
@@ -110,18 +101,52 @@ export default function ProviderCreate() {
   const validate = () => {
     const e: Record<string,string> = {};
     if (!providerName.trim()) e.providerName = "Provider name is required";
-    if (!activityType) e.activityType = "Activity type is required";
+    if (!activityType) e.activityType = "Please select an activity type";
     if (!lessonTitle.trim()) e.lessonTitle = "Lesson title is required";
-    if (!description.trim()) e.description = "Description is required";
+    if (!description.trim()) e.description = "Please add a short description";
     if (selectedSuburbs.length === 0) e.suburbs = "Please select at least one suburb";
-    if (!price) e.price = "Price is required";
+    if (!price || isNaN(parseFloat(price))) e.price = "Please enter a valid price";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validate()) return;
-    setSubmitted(true);
+    if (!user) { router.push("/"); return; }
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      let photoUrl = "";
+      if (photo) {
+        const ext = photo.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("listing-photos").upload(path, photo);
+        if (!uploadError) {
+          const { data } = supabase.storage.from("listing-photos").getPublicUrl(path);
+          photoUrl = data.publicUrl;
+        }
+      }
+      const { error } = await supabase.from("listings").insert({
+        user_id: user.id,
+        provider_name: providerName,
+        activity_type: activityType,
+        lesson_title: lessonTitle,
+        description,
+        photo_url: photoUrl,
+        suburbs: JSON.stringify(selectedSuburbs),
+        online_available: onlineAvailable,
+        price: parseFloat(price),
+        session_duration: sessionDuration,
+        lesson_type: lessonType,
+        status: "pending",
+      });
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = { width:"100%", background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:10, padding:"0.7rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif", boxSizing:"border-box" };
@@ -132,26 +157,28 @@ export default function ProviderCreate() {
   if (submitted) return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;}body{background:#F0F7FF;color:#1e3a5f;font-family:'DM Sans',sans-serif;}`}</style>
-      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",background:"rgba(255,255,255,0.95)",borderBottom:"1px solid #dbeafe",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
+      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",background:"white",borderBottom:"1px solid #dbeafe"}}>
         <div onClick={()=>router.push("/")} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2,cursor:"pointer"}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
       </nav>
       <div style={{maxWidth:560,margin:"5rem auto",padding:"2rem",textAlign:"center"}}>
         <div style={{width:72,height:72,borderRadius:"50%",background:"#EAF3DE",border:"2px solid #84CC16",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem",margin:"0 auto 1.5rem"}}>🎉</div>
         <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2.2rem",letterSpacing:1,marginBottom:"0.8rem",color:"#1e3a5f"}}>Listing Submitted!</h1>
-        <p style={{color:"#64748b",lineHeight:1.7,marginBottom:"2rem",fontSize:"0.95rem"}}>Thanks <strong style={{color:"#1e3a5f"}}>{providerName}</strong>! Your listing is under review. We'll notify you within 24 hours once it's approved and live on PlayUp.</p>
+        <p style={{color:"#64748b",lineHeight:1.7,marginBottom:"2rem",fontSize:"0.95rem"}}>
+          Thanks <strong style={{color:"#1e3a5f"}}>{providerName}</strong>! Your listing is under review. We'll notify you within 24 hours once it's approved and live on PlayUp.
+        </p>
         <div style={{background:"white",borderRadius:16,padding:"1.5rem",border:"1px solid #dbeafe",marginBottom:"2rem",textAlign:"left"}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",letterSpacing:1,marginBottom:"1rem",color:"#1e3a5f"}}>Listing Summary</div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",letterSpacing:1,marginBottom:"1rem",color:"#1e3a5f"}}>Your Listing Summary</div>
           <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",fontSize:"0.88rem",color:"#475569"}}>
-            <div><span style={{color:"#64748b",display:"inline-block",width:100}}>Activity:</span> <strong style={{color:"#1e3a5f"}}>{activityType}</strong></div>
-            <div><span style={{color:"#64748b",display:"inline-block",width:100}}>Title:</span> {lessonTitle}</div>
-            <div><span style={{color:"#64748b",display:"inline-block",width:100}}>Location:</span> {selectedSuburbs.map(s=>`${s.name} ${s.postcode}`).join(", ")}</div>
-            <div><span style={{color:"#64748b",display:"inline-block",width:100}}>Price:</span> ${price}/session</div>
+            <div><span style={{color:"#64748b",display:"inline-block",width:110}}>Activity:</span><strong style={{color:"#1e3a5f"}}>{activityType}</strong></div>
+            <div><span style={{color:"#64748b",display:"inline-block",width:110}}>Title:</span>{lessonTitle}</div>
+            <div><span style={{color:"#64748b",display:"inline-block",width:110}}>Suburbs:</span>{selectedSuburbs.map(s=>`${s.name} ${s.postcode}`).join(", ")}</div>
+            <div><span style={{color:"#64748b",display:"inline-block",width:110}}>Price:</span>${price}/session · {sessionDuration==="60"?"1 hour":sessionDuration==="30"?"30 mins":sessionDuration==="45"?"45 mins":sessionDuration==="90"?"1.5 hrs":"2 hrs"} · {lessonType}</div>
           </div>
         </div>
         <div style={{background:"#EAF3DE",borderRadius:12,padding:"1rem 1.25rem",border:"1px solid #97C459",marginBottom:"2rem",textAlign:"left"}}>
-          <div style={{fontSize:"0.85rem",fontWeight:700,color:"#27500A",marginBottom:"0.5rem"}}>While you wait, complete your profile to get more enquiries:</div>
+          <div style={{fontSize:"0.85rem",fontWeight:700,color:"#27500A",marginBottom:"0.5rem"}}>While you wait, you can complete your profile to get more enquiries:</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
-            {["Availability","Booking options","Pricing packages","Experience & credentials","What to bring","House rules"].map(item=>(
+            {["Availability","Booking packages","Experience & credentials","What to bring","House rules","Payment options"].map(item=>(
               <span key={item} style={{fontSize:"0.75rem",padding:"0.25rem 0.7rem",borderRadius:999,background:"white",border:"1px solid #97C459",color:"#27500A"}}>{item}</span>
             ))}
           </div>
@@ -169,8 +196,7 @@ export default function ProviderCreate() {
         body{background:#F0F7FF;color:#1e3a5f;font-family:'DM Sans',sans-serif;}
         .btn{cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
         input:focus,select:focus,textarea:focus{border-color:#84CC16!important;outline:none;}
-        .dropdown-item:hover{background:#EAF3DE!important;}
-        .lesson-type-btn{padding:0.5rem 1.2rem;border-radius:999px;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
+        .dropdown-item:hover{background:#EAF3DE!important;color:#27500A!important;}
         @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
         .dropdown-anim{animation:fadeIn 0.15s ease;}
       `}</style>
@@ -191,56 +217,40 @@ export default function ProviderCreate() {
         <div style={cardStyle}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",letterSpacing:1,color:"#1e3a5f",marginBottom:"0.3rem"}}>About Your Lessons</div>
           <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>Tell students who you are and what you teach.</p>
-
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"1rem"}}>
             <div>
               <label style={labelStyle}>Provider / Business Name *</label>
               <input value={providerName} onChange={e=>setProviderName(e.target.value)} placeholder="e.g. Sarah Mitchell Coaching" style={{...inputStyle,borderColor:errors.providerName?"#fca5a5":"#bfdbfe"}}/>
-              {errors.providerName && <div style={errorStyle}>{errors.providerName}</div>}
+              {errors.providerName&&<div style={errorStyle}>{errors.providerName}</div>}
             </div>
-
-            {/* ACTIVITY TYPE — searchable */}
             <div ref={activityRef}>
               <label style={labelStyle}>Activity Type *</label>
               <div style={{position:"relative"}}>
-                <input
-                  value={activitySearch}
-                  onChange={e=>{ setActivitySearch(e.target.value); setActivityType(""); setShowActivityDropdown(true); }}
-                  onFocus={()=>setShowActivityDropdown(true)}
-                  placeholder="Type to search (e.g. Tennis)..."
-                  style={{...inputStyle,borderColor:errors.activityType?"#fca5a5":"#bfdbfe"}}
-                />
+                <input value={activitySearch} onChange={e=>{setActivitySearch(e.target.value);setActivityType("");setShowActivityDropdown(true);}} onFocus={()=>setShowActivityDropdown(true)} placeholder="Type to search (e.g. Tennis)..." style={{...inputStyle,borderColor:errors.activityType?"#fca5a5":"#bfdbfe"}}/>
                 {showActivityDropdown && filteredActivities.length > 0 && (
                   <div className="dropdown-anim" style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1px solid #bfdbfe",borderRadius:10,boxShadow:"0 8px 24px rgba(30,58,95,0.12)",zIndex:50,maxHeight:220,overflowY:"auto",marginTop:4}}>
-                    {filteredActivities.map(a => (
-                      <div key={a} className="dropdown-item" onClick={()=>selectActivity(a)}
-                        style={{padding:"0.6rem 1rem",fontSize:"0.88rem",color:"#1e3a5f",cursor:"pointer",borderBottom:"1px solid #f1f5f9"}}>
-                        {a}
-                      </div>
+                    {filteredActivities.map(a=>(
+                      <div key={a} className="dropdown-item" onClick={()=>selectActivity(a)} style={{padding:"0.6rem 1rem",fontSize:"0.88rem",color:"#1e3a5f",cursor:"pointer",borderBottom:"1px solid #f1f5f9"}}>{a}</div>
                     ))}
                   </div>
                 )}
               </div>
-              {errors.activityType && <div style={errorStyle}>{errors.activityType}</div>}
+              {errors.activityType&&<div style={errorStyle}>{errors.activityType}</div>}
             </div>
           </div>
-
           <div style={{marginBottom:"1rem"}}>
             <label style={labelStyle}>Lesson Title *</label>
             <input value={lessonTitle} onChange={e=>setLessonTitle(e.target.value)} placeholder="e.g. Beginner to intermediate tennis coaching for adults" style={{...inputStyle,borderColor:errors.lessonTitle?"#fca5a5":"#bfdbfe"}}/>
-            {errors.lessonTitle && <div style={errorStyle}>{errors.lessonTitle}</div>}
+            {errors.lessonTitle&&<div style={errorStyle}>{errors.lessonTitle}</div>}
           </div>
-
           <div>
             <label style={labelStyle}>About You & Your Lessons *</label>
-            <textarea value={description} onChange={e=>setDescription(e.target.value)}
-              placeholder="A short bio — what you offer, your teaching style, and who your lessons are suited for. 2–4 sentences is plenty."
-              style={{...inputStyle,resize:"vertical",minHeight:90,borderColor:errors.description?"#fca5a5":"#bfdbfe"}}/>
-            {errors.description && <div style={errorStyle}>{errors.description}</div>}
+            <textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="A short bio — what you offer, your teaching style, and who your lessons suit. 2–4 sentences is plenty." style={{...inputStyle,resize:"vertical",minHeight:90,borderColor:errors.description?"#fca5a5":"#bfdbfe"}}/>
+            {errors.description&&<div style={errorStyle}>{errors.description}</div>}
           </div>
         </div>
 
-        {/* PROFILE PHOTO */}
+        {/* PHOTO */}
         <div style={cardStyle}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",letterSpacing:1,color:"#1e3a5f",marginBottom:"0.3rem"}}>Profile Photo</div>
           <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>A photo builds trust and gets 3x more enquiries. A headshot or action shot both work great.</p>
@@ -255,7 +265,7 @@ export default function ProviderCreate() {
           ) : (
             <label style={{display:"block",cursor:"pointer"}}>
               <input type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}}/>
-              <div style={{border:"1.5px dashed #bfdbfe",borderRadius:12,padding:"2rem",textAlign:"center",background:"#f8faff",transition:"all 0.2s"}}>
+              <div style={{border:"1.5px dashed #bfdbfe",borderRadius:12,padding:"2rem",textAlign:"center",background:"#f8faff"}}>
                 <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📷</div>
                 <div style={{fontSize:"0.9rem",fontWeight:600,color:"#1e3a5f",marginBottom:"0.3rem"}}>Click to upload a photo</div>
                 <div style={{fontSize:"0.78rem",color:"#94a3b8"}}>JPG or PNG · Max 2MB · Recommended 400×400px</div>
@@ -267,47 +277,31 @@ export default function ProviderCreate() {
         {/* LOCATION */}
         <div style={cardStyle}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",letterSpacing:1,color:"#1e3a5f",marginBottom:"0.3rem"}}>Location</div>
-          <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>Select up to {MAX_SUBURBS} suburbs where you offer lessons. Include nearby suburbs to reach more students.</p>
-
+          <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>Select up to {MAX_SUBURBS} suburbs. Include nearby suburbs to reach more students.</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"1rem"}}>
             <div>
               <label style={labelStyle}>State</label>
-              <select value={selectedState} onChange={e=>{setSelectedState(e.target.value);setSelectedCity("");setSuburbSearch("");}} style={inputStyle}>
+              <select value={selectedState} onChange={e=>{setSelectedState(e.target.value);setSelectedCity("");}} style={inputStyle}>
                 <option value="">All states</option>
                 {STATES.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>City</label>
-              <select value={selectedCity} onChange={e=>{setSelectedCity(e.target.value);setSuburbSearch("");}} style={inputStyle}>
+              <select value={selectedCity} onChange={e=>setSelectedCity(e.target.value)} style={inputStyle}>
                 <option value="">All cities</option>
                 {cities.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
           </div>
-
-          {/* SUBURB MULTI-SELECT */}
           <div ref={suburbRef}>
-            <label style={labelStyle}>
-              Suburbs * 
-              <span style={{textTransform:"none",letterSpacing:0,fontWeight:400,color:"#94a3b8",marginLeft:6}}>
-                {selectedSuburbs.length}/{MAX_SUBURBS} selected
-              </span>
-            </label>
+            <label style={labelStyle}>Suburbs * <span style={{textTransform:"none",letterSpacing:0,fontWeight:400,color:"#94a3b8",marginLeft:6}}>{selectedSuburbs.length}/{MAX_SUBURBS} selected</span></label>
             <div style={{position:"relative"}}>
-              <input
-                value={suburbSearch}
-                onChange={e=>setSuburbSearch(e.target.value)}
-                onFocus={()=>setShowSuburbDropdown(true)}
-                placeholder={selectedSuburbs.length >= MAX_SUBURBS ? `Maximum ${MAX_SUBURBS} suburbs reached` : "Type suburb name or postcode..."}
-                disabled={selectedSuburbs.length >= MAX_SUBURBS}
-                style={{...inputStyle,borderColor:errors.suburbs?"#fca5a5":"#bfdbfe",opacity:selectedSuburbs.length>=MAX_SUBURBS?0.6:1}}
-              />
+              <input value={suburbSearch} onChange={e=>setSuburbSearch(e.target.value)} onFocus={()=>setShowSuburbDropdown(true)} disabled={selectedSuburbs.length>=MAX_SUBURBS} placeholder={selectedSuburbs.length>=MAX_SUBURBS?`Maximum ${MAX_SUBURBS} suburbs reached`:"Type suburb name or postcode..."} style={{...inputStyle,borderColor:errors.suburbs?"#fca5a5":"#bfdbfe",opacity:selectedSuburbs.length>=MAX_SUBURBS?0.6:1}}/>
               {showSuburbDropdown && suburbSearch && filteredSuburbs.length > 0 && selectedSuburbs.length < MAX_SUBURBS && (
                 <div className="dropdown-anim" style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1px solid #bfdbfe",borderRadius:10,boxShadow:"0 8px 24px rgba(30,58,95,0.12)",zIndex:50,maxHeight:240,overflowY:"auto",marginTop:4}}>
-                  {filteredSuburbs.map(s => (
-                    <div key={`${s.name}-${s.postcode}`} className="dropdown-item" onClick={()=>addSuburb(s)}
-                      style={{padding:"0.65rem 1rem",fontSize:"0.88rem",color:"#1e3a5f",cursor:"pointer",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  {filteredSuburbs.map(s=>(
+                    <div key={`${s.name}-${s.postcode}`} className="dropdown-item" onClick={()=>addSuburb(s)} style={{padding:"0.65rem 1rem",fontSize:"0.88rem",color:"#1e3a5f",cursor:"pointer",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span>{s.name}</span>
                       <span style={{fontSize:"0.78rem",color:"#94a3b8"}}>{s.state} {s.postcode}</span>
                     </div>
@@ -315,12 +309,10 @@ export default function ProviderCreate() {
                 </div>
               )}
             </div>
-            {errors.suburbs && <div style={errorStyle}>{errors.suburbs}</div>}
-
-            {/* SELECTED SUBURBS */}
+            {errors.suburbs&&<div style={errorStyle}>{errors.suburbs}</div>}
             {selectedSuburbs.length > 0 && (
               <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginTop:"0.8rem"}}>
-                {selectedSuburbs.map((s,i) => (
+                {selectedSuburbs.map((s,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:"0.4rem",background:"#EAF3DE",border:"1px solid #97C459",borderRadius:999,padding:"0.3rem 0.8rem",fontSize:"0.82rem",color:"#27500A",fontWeight:600}}>
                     📍 {s.name} <span style={{color:"#4d7c0f",fontWeight:400}}>{s.postcode}</span>
                     <button className="btn" onClick={()=>removeSuburb(i)} style={{background:"none",border:"none",color:"#4d7c0f",fontSize:"0.9rem",padding:"0 0 0 2px",lineHeight:1}}>✕</button>
@@ -329,7 +321,6 @@ export default function ProviderCreate() {
               </div>
             )}
           </div>
-
           <div style={{marginTop:"1rem",display:"flex",alignItems:"center",gap:"0.8rem",padding:"0.8rem 1rem",background:"#f8faff",borderRadius:10,border:"1px solid #dbeafe"}}>
             <label style={{display:"flex",alignItems:"center",gap:"0.6rem",cursor:"pointer",fontSize:"0.9rem",color:"#475569",userSelect:"none"}}>
               <input type="checkbox" checked={onlineAvailable} onChange={e=>setOnlineAvailable(e.target.checked)} style={{width:16,height:16,accentColor:"#84CC16"}}/>
@@ -341,29 +332,27 @@ export default function ProviderCreate() {
         {/* PRICING */}
         <div style={cardStyle}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",letterSpacing:1,color:"#1e3a5f",marginBottom:"0.3rem"}}>Pricing</div>
-          <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>Set your base rate. Add booking packages (weekly, term, annual etc.) from your dashboard after approval.</p>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"1rem",marginBottom:"1rem"}}>
+          <p style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1.4rem"}}>Set your base rate. Add booking packages from your dashboard after approval.</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"1rem"}}>
             <div>
               <label style={labelStyle}>Price per session (AUD) *</label>
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:"0.8rem",top:"50%",transform:"translateY(-50%)",color:"#64748b",fontSize:"0.9rem"}}>$</span>
                 <input type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="75" style={{...inputStyle,paddingLeft:"1.6rem",borderColor:errors.price?"#fca5a5":"#bfdbfe"}}/>
               </div>
-              {errors.price && <div style={errorStyle}>{errors.price}</div>}
+              {errors.price&&<div style={errorStyle}>{errors.price}</div>}
             </div>
             <div>
-              <label style={labelStyle}>Session duration</label>
+              <label style={labelStyle}>Session Duration</label>
               <select value={sessionDuration} onChange={e=>setSessionDuration(e.target.value)} style={inputStyle}>
                 {[["30","30 minutes"],["45","45 minutes"],["60","1 hour"],["90","1.5 hours"],["120","2 hours"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Lesson type</label>
+              <label style={labelStyle}>Lesson Type</label>
               <div style={{display:"flex",gap:"0.4rem",marginTop:"0.1rem"}}>
                 {["Private","Group","Both"].map(t=>(
-                  <button key={t} className="lesson-type-btn" onClick={()=>setLessonType(t)}
-                    style={{flex:1,background:lessonType===t?"#1e3a5f":"white",color:lessonType===t?"white":"#64748b",border:`1px solid ${lessonType===t?"#1e3a5f":"#bfdbfe"}`,fontSize:"0.78rem",padding:"0.5rem 0.4rem"}}>
+                  <button key={t} className="btn" onClick={()=>setLessonType(t)} style={{flex:1,padding:"0.6rem 0.4rem",borderRadius:8,fontSize:"0.78rem",fontWeight:600,background:lessonType===t?"#1e3a5f":"white",color:lessonType===t?"white":"#64748b",border:`1px solid ${lessonType===t?"#1e3a5f":"#bfdbfe"}`}}>
                     {t}
                   </button>
                 ))}
@@ -377,14 +366,21 @@ export default function ProviderCreate() {
           <div style={{fontSize:"1.2rem",marginTop:"0.1rem"}}>📋</div>
           <div>
             <div style={{fontSize:"0.9rem",fontWeight:700,color:"#27500A",marginBottom:"0.3rem"}}>Your listing will be reviewed before going live</div>
-            <div style={{fontSize:"0.82rem",color:"#3B6D11",lineHeight:1.6}}>We check every listing within 24 hours. Most are approved same day. You'll get an email notification when you're live.</div>
+            <div style={{fontSize:"0.82rem",color:"#3B6D11",lineHeight:1.6}}>We check every listing within 24 hours. Most are approved same day. You'll get an email when you're live.</div>
           </div>
         </div>
 
-        {/* SUBMIT */}
+        {submitError && (
+          <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:10,padding:"0.8rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#dc2626"}}>
+            {submitError}
+          </div>
+        )}
+
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <button className="btn" onClick={()=>router.push("/")} style={{padding:"0.85rem 2rem",border:"1px solid #bfdbfe",borderRadius:999,background:"white",color:"#1e3a5f",fontWeight:600,fontSize:"0.95rem"}}>Cancel</button>
-          <button className="btn" onClick={handleSubmit} style={{padding:"0.85rem 2.5rem",background:"#84CC16",color:"#1e3a5f",border:"none",borderRadius:999,fontWeight:700,fontSize:"1rem"}}>Submit for Review →</button>
+          <button className="btn" onClick={handleSubmit} disabled={submitting} style={{padding:"0.85rem 2.5rem",background:submitting?"#97C459":"#84CC16",color:"#1e3a5f",border:"none",borderRadius:999,fontWeight:700,fontSize:"1rem",opacity:submitting?0.8:1}}>
+            {submitting ? "Submitting..." : "Submit for Review →"}
+          </button>
         </div>
       </div>
     </>
