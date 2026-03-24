@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-const ADMIN_PASSWORD = "playup2026";
+const ADMIN_EMAILS = ["abh677225@gmail.com"];
 
 type Listing = {
   id: string;
+  user_id: string;
   provider_name: string;
   activity_type: string;
   lesson_title: string;
@@ -19,7 +20,6 @@ type Listing = {
   online_available: boolean;
   status: string;
   created_at: string;
-  user_id: string;
 };
 
 type Stats = {
@@ -33,9 +33,9 @@ type Stats = {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [authed, setAuthed] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const [activeTab, setActiveTab] = useState<"pending"|"approved"|"rejected"|"all">("pending");
   const [listings, setListings] = useState<Listing[]>([]);
   const [stats, setStats] = useState<Stats>({ total:0, pending:0, approved:0, rejected:0, messages:0, conversations:0 });
@@ -67,23 +67,20 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("playup_admin");
-    if (saved === ADMIN_PASSWORD) { setAuthed(true); loadData(); }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const email = session?.user?.email || "";
+      setUserEmail(email);
+      if (ADMIN_EMAILS.includes(email)) {
+        setIsAdmin(true);
+        loadData();
+      }
+      setAuthChecked(true);
+    });
   }, [loadData]);
 
-  const handleLogin = () => {
-    if (passwordInput === ADMIN_PASSWORD) {
-      sessionStorage.setItem("playup_admin", ADMIN_PASSWORD);
-      setAuthed(true);
-      loadData();
-    } else {
-      setPasswordError("Incorrect password. Please try again.");
-    }
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("playup_admin");
-    setAuthed(false);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -102,35 +99,43 @@ export default function AdminDashboard() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-AU", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 
   const filteredListings = listings.filter(l => activeTab === "all" ? true : l.status === activeTab);
-
   const statusColor = (s: string) => ({ pending:"#F97316", approved:"#84CC16", rejected:"#EF4444" }[s] || "#64748b");
   const statusBg = (s: string) => ({ pending:"#FFF7ED", approved:"#EAF3DE", rejected:"#FEF2F2" }[s] || "#f8faff");
   const statusBorder = (s: string) => ({ pending:"#FED7AA", approved:"#97C459", rejected:"#FECACA" }[s] || "#dbeafe");
 
-  const inputStyle: React.CSSProperties = { width:"100%", background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:10, padding:"0.7rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif", boxSizing:"border-box" };
-
-  // LOGIN SCREEN
-  if (!authed) return (
+  // LOADING STATE
+  if (!authChecked) return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;}body{background:#F0F7FF;color:#1e3a5f;font-family:'DM Sans',sans-serif;}`}</style>
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-        <div style={{background:"white",borderRadius:20,padding:"2.5rem",width:"100%",maxWidth:400,border:"1px solid #dbeafe",boxShadow:"0 4px 20px rgba(30,58,95,0.1)"}}>
-          <div style={{textAlign:"center",marginBottom:"2rem"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2,marginBottom:"0.5rem"}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",letterSpacing:1,color:"#1e3a5f"}}>Admin Dashboard</div>
-            <div style={{fontSize:"0.85rem",color:"#64748b",marginTop:"0.3rem"}}>Enter your admin password to continue</div>
-          </div>
-          {passwordError && <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"0.7rem 1rem",marginBottom:"1rem",fontSize:"0.85rem",color:"#dc2626"}}>{passwordError}</div>}
-          <div style={{marginBottom:"1rem"}}>
-            <input type="password" placeholder="Admin password" value={passwordInput} onChange={e=>setPasswordInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={inputStyle} autoFocus/>
-          </div>
-          <button onClick={handleLogin} style={{width:"100%",padding:"0.85rem",background:"#1e3a5f",color:"white",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
-            Enter Dashboard
-          </button>
-          <div style={{textAlign:"center",marginTop:"1rem"}}>
-            <span onClick={()=>router.push("/")} style={{fontSize:"0.82rem",color:"#84CC16",cursor:"pointer",fontWeight:600}}>← Back to PlayUp</span>
-          </div>
-        </div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;}body{background:#F0F7FF;font-family:'DM Sans',sans-serif;}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:40,height:40,border:"3px solid #dbeafe",borderTopColor:"#84CC16",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      </div>
+    </>
+  );
+
+  // NOT LOGGED IN
+  if (authChecked && !userEmail) return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;}body{background:#F0F7FF;color:#1e3a5f;font-family:'DM Sans',sans-serif;}`}</style>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"1rem",textAlign:"center",padding:"2rem"}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2,marginBottom:"0.5rem"}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
+        <div style={{fontSize:"1.5rem"}}>🔐</div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.6rem",color:"#1e3a5f"}}>Login Required</div>
+        <p style={{color:"#64748b",maxWidth:320}}>You need to be logged in with an admin account to access this page.</p>
+        <button onClick={()=>router.push("/")} style={{padding:"0.7rem 1.5rem",background:"#1e3a5f",color:"white",border:"none",borderRadius:999,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Go to PlayUp & Log In</button>
+      </div>
+    </>
+  );
+
+  // LOGGED IN BUT NOT ADMIN
+  if (authChecked && userEmail && !isAdmin) return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;}body{background:#F0F7FF;color:#1e3a5f;font-family:'DM Sans',sans-serif;}`}</style>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"1rem",textAlign:"center",padding:"2rem"}}>
+        <div style={{fontSize:"3rem"}}>🚫</div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.6rem",color:"#1e3a5f"}}>Access Denied</div>
+        <p style={{color:"#64748b",maxWidth:320}}>Your account <strong>{userEmail}</strong> does not have admin access.</p>
+        <button onClick={()=>router.push("/")} style={{padding:"0.7rem 1.5rem",background:"#1e3a5f",color:"white",border:"none",borderRadius:999,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Back to PlayUp</button>
       </div>
     </>
   );
@@ -156,8 +161,10 @@ export default function AdminDashboard() {
           <div onClick={()=>router.push("/")} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:2,cursor:"pointer"}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
           <div style={{background:"#1e3a5f",color:"#84CC16",fontSize:"0.7rem",fontWeight:700,letterSpacing:1,padding:"0.2rem 0.7rem",borderRadius:999,textTransform:"uppercase"}}>Admin</div>
         </div>
-        <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
+        <div style={{fontSize:"0.82rem",color:"#64748b"}}>Logged in as <strong style={{color:"#1e3a5f"}}>{userEmail}</strong></div>
+        <div style={{display:"flex",gap:"0.8rem",alignItems:"center"}}>
           <button className="btn" onClick={loadData} style={{padding:"0.4rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:"white",color:"#1e3a5f",fontSize:"0.82rem",fontWeight:600}}>↻ Refresh</button>
+          <button className="btn" onClick={()=>router.push("/")} style={{padding:"0.4rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:"white",color:"#1e3a5f",fontSize:"0.82rem",fontWeight:600}}>← PlayUp</button>
           <button className="btn" onClick={handleLogout} style={{padding:"0.4rem 1rem",border:"1px solid #fca5a5",borderRadius:999,background:"#fef2f2",color:"#dc2626",fontSize:"0.82rem",fontWeight:600}}>Log Out</button>
         </div>
       </nav>
@@ -167,29 +174,29 @@ export default function AdminDashboard() {
         {/* STATS */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"0.8rem",marginBottom:"2rem"}}>
           {[
-            ["Total Listings", stats.total, "#1e3a5f"],
-            ["Pending", stats.pending, "#F97316"],
-            ["Approved", stats.approved, "#84CC16"],
-            ["Rejected", stats.rejected, "#EF4444"],
-            ["Messages", stats.messages, "#3B82F6"],
-            ["Conversations", stats.conversations, "#8B5CF6"],
-          ].map(([label, value, color])=>(
+            ["Total",stats.total,"#1e3a5f"],
+            ["Pending",stats.pending,"#F97316"],
+            ["Approved",stats.approved,"#84CC16"],
+            ["Rejected",stats.rejected,"#EF4444"],
+            ["Messages",stats.messages,"#3B82F6"],
+            ["Conversations",stats.conversations,"#8B5CF6"],
+          ].map(([label,value,color])=>(
             <div key={label as string} style={{background:"white",borderRadius:12,padding:"1rem",border:"1px solid #dbeafe",textAlign:"center",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:color as string,letterSpacing:1,lineHeight:1}}>{value as number}</div>
-              <div style={{fontSize:"0.72rem",color:"#64748b",marginTop:"0.3rem",fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{label as string}</div>
+              <div style={{fontSize:"0.7rem",color:"#64748b",marginTop:"0.3rem",fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{label as string}</div>
             </div>
           ))}
         </div>
 
-        {/* TABS */}
-        <div style={{background:"white",borderRadius:16,border:"1px solid #dbeafe",overflow:"hidden",marginBottom:"1.5rem",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
+        {/* LISTINGS */}
+        <div style={{background:"white",borderRadius:16,border:"1px solid #dbeafe",overflow:"hidden",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
           <div style={{display:"flex",borderBottom:"1px solid #dbeafe",padding:"0 1rem"}}>
             {[
-              ["pending","⏳ Pending", stats.pending],
-              ["approved","✅ Approved", stats.approved],
-              ["rejected","❌ Rejected", stats.rejected],
-              ["all","📋 All", stats.total],
-            ].map(([tab, label, count])=>(
+              ["pending","⏳ Pending",stats.pending],
+              ["approved","✅ Approved",stats.approved],
+              ["rejected","❌ Rejected",stats.rejected],
+              ["all","📋 All",stats.total],
+            ].map(([tab,label,count])=>(
               <button key={tab as string} className="tab-btn" onClick={()=>setActiveTab(tab as any)}
                 style={{color:activeTab===tab?"#1e3a5f":"#64748b",borderBottomColor:activeTab===tab?"#84CC16":"transparent"}}>
                 {label as string} <span style={{marginLeft:4,background:activeTab===tab?"#EAF3DE":"#f1f5f9",color:activeTab===tab?"#27500A":"#94a3b8",fontSize:"0.72rem",fontWeight:700,padding:"1px 7px",borderRadius:999}}>{count as number}</span>
@@ -206,8 +213,8 @@ export default function AdminDashboard() {
             ) : filteredListings.length === 0 ? (
               <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
                 <div style={{fontSize:"2.5rem",marginBottom:"0.8rem"}}>📭</div>
-                <div style={{fontSize:"1rem",fontWeight:600,color:"#1e3a5f",marginBottom:"0.3rem"}}>No {activeTab === "all" ? "" : activeTab} listings</div>
-                <div style={{fontSize:"0.85rem"}}>Nothing to show here yet.</div>
+                <div style={{fontSize:"1rem",fontWeight:600,color:"#1e3a5f",marginBottom:"0.3rem"}}>No {activeTab==="all"?"":activeTab} listings</div>
+                <div style={{fontSize:"0.85rem"}}>Nothing here yet.</div>
               </div>
             ) : (
               filteredListings.map(listing => {
@@ -216,13 +223,12 @@ export default function AdminDashboard() {
                 const isActioning = actionLoading === listing.id;
                 return (
                   <div key={listing.id} className="listing-card">
-                    {/* CARD HEADER */}
                     <div style={{padding:"1.2rem",display:"flex",alignItems:"flex-start",gap:"1rem",cursor:"pointer"}} onClick={()=>setExpandedId(isExpanded?null:listing.id)}>
                       {listing.photo_url ? (
                         <img src={listing.photo_url} alt="" style={{width:56,height:56,borderRadius:10,objectFit:"cover",border:"1px solid #dbeafe",flexShrink:0}}/>
                       ) : (
                         <div style={{width:56,height:56,borderRadius:10,background:"#1e3a5f",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.5rem",flexShrink:0}}>
-                          {{Tennis:"🎾",Piano:"🎹",Swimming:"🏊",Yoga:"🧘",Guitar:"🎸","Martial Arts":"🥋"}[listing.activity_type]||"📚"}
+                          {{"Tennis":"🎾","Piano":"🎹","Swimming":"🏊","Yoga":"🧘","Guitar":"🎸","Martial Arts":"🥋"}[listing.activity_type]||"📚"}
                         </div>
                       )}
                       <div style={{flex:1,minWidth:0}}>
@@ -236,22 +242,21 @@ export default function AdminDashboard() {
                           <strong style={{color:"#1e3a5f"}}>{listing.provider_name}</strong> · {listing.activity_type} · ${listing.price}/session · {getDuration(listing.session_duration)} · {listing.lesson_type}
                         </div>
                         <div style={{fontSize:"0.78rem",color:"#94a3b8"}}>
-                          📍 {suburbs.slice(0,3).map((s:any)=>s.name).join(", ")}{suburbs.length>3?` +${suburbs.length-3} more`:""} · Submitted {formatDate(listing.created_at)}
+                          📍 {suburbs.slice(0,3).map((s:any)=>s.name).join(", ")}{suburbs.length>3?` +${suburbs.length-3} more`:""} · {formatDate(listing.created_at)}
                         </div>
                       </div>
                       <div style={{fontSize:"0.8rem",color:"#94a3b8",flexShrink:0}}>{isExpanded?"▲":"▼"}</div>
                     </div>
 
-                    {/* EXPANDED DETAILS */}
                     {isExpanded && (
                       <div style={{borderTop:"1px solid #f1f5f9",padding:"1.2rem",background:"#f8faff"}}>
                         {listing.description && (
                           <div style={{marginBottom:"1rem"}}>
                             <div style={{fontSize:"0.72rem",fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:0.8,marginBottom:"0.4rem"}}>Description</div>
-                            <p style={{fontSize:"0.88rem",color:"#475569",lineHeight:1.7}}>{listing.description}</p>
+                            <p style={{fontSize:"0.88rem",color:"#475569",lineHeight:1.7,background:"white",padding:"0.8rem",borderRadius:8,border:"1px solid #dbeafe"}}>{listing.description}</p>
                           </div>
                         )}
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.8rem",marginBottom:"1rem"}}>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.8rem",marginBottom:"1rem"}}>
                           {[
                             ["Activity",listing.activity_type],
                             ["Price",`$${listing.price}/session`],
@@ -276,32 +281,24 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         )}
-                        <div style={{fontSize:"0.72rem",color:"#94a3b8",marginBottom:"1rem"}}>
-                          Listing ID: {listing.id} · User ID: {listing.user_id}
-                        </div>
-
-                        {/* ACTION BUTTONS */}
+                        <div style={{fontSize:"0.7rem",color:"#94a3b8",marginBottom:"1rem"}}>ID: {listing.id}</div>
                         <div style={{display:"flex",gap:"0.6rem",flexWrap:"wrap"}}>
-                          {listing.status !== "approved" && (
-                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"approved")} disabled={!!isActioning}
-                              style={{background:"#84CC16",color:"#1e3a5f",opacity:isActioning?0.6:1}}>
+                          {listing.status!=="approved" && (
+                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"approved")} disabled={!!isActioning} style={{background:"#84CC16",color:"#1e3a5f",opacity:isActioning?0.6:1}}>
                               {isActioning?"Working...":"✅ Approve"}
                             </button>
                           )}
-                          {listing.status !== "rejected" && (
-                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"rejected")} disabled={!!isActioning}
-                              style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fca5a5",opacity:isActioning?0.6:1}}>
+                          {listing.status!=="rejected" && (
+                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"rejected")} disabled={!!isActioning} style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fca5a5",opacity:isActioning?0.6:1}}>
                               {isActioning?"Working...":"❌ Reject"}
                             </button>
                           )}
-                          {listing.status !== "pending" && (
-                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"pending")} disabled={!!isActioning}
-                              style={{background:"#FFF7ED",color:"#F97316",border:"1px solid #FED7AA",opacity:isActioning?0.6:1}}>
+                          {listing.status!=="pending" && (
+                            <button className="action-btn" onClick={()=>updateStatus(listing.id,"pending")} disabled={!!isActioning} style={{background:"#FFF7ED",color:"#F97316",border:"1px solid #FED7AA",opacity:isActioning?0.6:1}}>
                               {isActioning?"Working...":"↩️ Set Pending"}
                             </button>
                           )}
-                          <button className="action-btn" onClick={()=>window.open(`/listings/${listing.id}`,"_blank")}
-                            style={{background:"#EFF6FF",color:"#1e40af",border:"1px solid #bfdbfe"}}>
+                          <button className="action-btn" onClick={()=>window.open(`/listings/${listing.id}`,"_blank")} style={{background:"#EFF6FF",color:"#1e40af",border:"1px solid #bfdbfe"}}>
                             👁️ View Live
                           </button>
                         </div>
@@ -315,9 +312,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {toast && (
-        <div style={{position:"fixed",bottom:"2rem",right:"2rem",background:"#1e3a5f",color:"white",padding:"0.8rem 1.5rem",borderRadius:12,fontWeight:700,fontSize:"0.9rem",zIndex:2000,animation:"slideUp 0.3s ease",border:"2px solid #84CC16"}}>{toast}</div>
-      )}
+      {toast && <div style={{position:"fixed",bottom:"2rem",right:"2rem",background:"#1e3a5f",color:"white",padding:"0.8rem 1.5rem",borderRadius:12,fontWeight:700,fontSize:"0.9rem",zIndex:2000,animation:"slideUp 0.3s ease",border:"2px solid #84CC16"}}>{toast}</div>}
     </>
   );
 }
