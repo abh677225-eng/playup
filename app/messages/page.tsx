@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
@@ -134,7 +134,7 @@ export default function Messages() {
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
-  const inputStyle: React.CSSProperties = { background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:999, padding:"0.6rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif", flex:1 };
+  cconst inputStyle: CSSProperties = { background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:999, padding:"0.6rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif", flex:1 };
 
   return (
     <>
