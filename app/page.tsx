@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
-type User = { email: string } | null;
+type User = { email: string; id: string } | null;
 type Listing = {
   id: string;
   provider_name: string;
@@ -12,11 +12,20 @@ type Listing = {
   description: string;
   photo_url: string;
   suburbs: string;
-  online_available: boolean;
   price: number;
   session_duration: string;
   lesson_type: string;
   status: string;
+};
+type Conversation = {
+  id: string;
+  listing_id: string;
+  seeker_id: string;
+  provider_id: string;
+  last_message: string;
+  last_message_at: string;
+  listing?: { lesson_title: string; activity_type: string; provider_name: string };
+  unread_count?: number;
 };
 
 const ACTIVITY_EMOJIS: Record<string,string> = {
@@ -24,8 +33,7 @@ const ACTIVITY_EMOJIS: Record<string,string> = {
   "Martial Arts":"🥋","Dancing":"💃","Singing":"🎤","Basketball":"🏀",
   "Football (Soccer)":"⚽","Cricket":"🏏","Cooking":"👨‍🍳","Coding & Programming":"💻",
   "Art & Drawing":"🎨","Violin":"🎻","Drums":"🥁","Boxing":"🥊",
-  "Golf":"⛳","Cycling":"🚴","Running":"🏃","Pilates":"🧘",
-  "Football (AFL)":"🏉","Netball":"🏐","Hockey":"🏑","Default":"📚"
+  "Golf":"⛳","Cycling":"🚴","Running":"🏃","Default":"📚"
 };
 
 export default function PlayUp() {
@@ -48,16 +56,34 @@ export default function PlayUp() {
   const [loginView, setLoginView] = useState<"login"|"forgot">("login");
   const [dbListings, setDbListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
+  const [showMsgPanel, setShowMsgPanel] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const msgPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? { email: session.user.email! } : null);
+      if (session?.user) setUser({ email: session.user.email!, id: session.user.id });
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? { email: session.user.email! } : null);
+      if (session?.user) setUser({ email: session.user.email!, id: session.user.id });
+      else setUser(null);
     });
     loadListings();
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) loadConversations();
+    else { setConversations([]); setUnreadCount(0); }
+  }, [user]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (msgPanelRef.current && !msgPanelRef.current.contains(e.target as Node)) setShowMsgPanel(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   const loadListings = async () => {
@@ -67,11 +93,18 @@ export default function PlayUp() {
     setLoadingListings(false);
   };
 
-  const getSuburbs = (suburbsJson: string) => {
-    try { return JSON.parse(suburbsJson); } catch { return []; }
+  const loadConversations = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("conversations").select("*").or(`seeker_id.eq.${user.id},provider_id.eq.${user.id}`).order("last_message_at", { ascending: false }).limit(10);
+    if (!data) return;
+    const enriched = await Promise.all(data.map(async (conv) => {
+      const { data: listing } = await supabase.from("listings").select("lesson_title,activity_type,provider_name").eq("id", conv.listing_id).single();
+      const { count } = await supabase.from("messages").select("id", { count: "exact" }).eq("listing_id", conv.listing_id).eq("receiver_id", user.id).eq("read", false);
+      return { ...conv, listing: listing || undefined, unread_count: count || 0 };
+    }));
+    setConversations(enriched);
+    setUnreadCount(enriched.reduce((sum, c) => sum + (c.unread_count || 0), 0));
   };
-
-  const getEmoji = (activityType: string) => ACTIVITY_EMOJIS[activityType] || ACTIVITY_EMOJIS["Default"];
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 4000); };
   const openLogin = () => { setAuthError(""); setAuthSuccess(""); setLoginView("login"); setModal("login"); };
@@ -85,7 +118,7 @@ export default function PlayUp() {
       if (error.message.includes("Invalid login credentials")) setAuthError("Incorrect email or password. Try again or use Forgot Password.");
       else if (error.message.includes("Email not confirmed")) setAuthError("Please confirm your email first — check your inbox.");
       else setAuthError(error.message);
-    } else { setModal(null); setEmail(""); setPassword(""); showToast("Welcome back! You're logged in 🎉"); }
+    } else { setModal(null); setEmail(""); setPassword(""); showToast("Welcome back! 🎉"); }
   };
 
   const handleSignup = async () => {
@@ -93,7 +126,7 @@ export default function PlayUp() {
     const { error } = await supabase.auth.signUp({ email, password, options: { data: { first_name: firstName, last_name: lastName } } });
     setAuthLoading(false);
     if (error) { setAuthError(error.message); }
-    else { setModal(null); setEmail(""); setPassword(""); setFirstName(""); setLastName(""); showToast("Account created! Check your email to confirm 📧"); }
+    else { setModal(null); setEmail(""); setPassword(""); setFirstName(""); setLastName(""); showToast("Account created! Check your email 📧"); }
   };
 
   const handleForgotPassword = async () => {
@@ -102,12 +135,14 @@ export default function PlayUp() {
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo: `${window.location.origin}/reset-password` });
     setAuthLoading(false);
     if (error) { setAuthError(error.message); }
-    else { setAuthSuccess(`Reset link sent to ${forgotEmail} — check your inbox!`); }
+    else { setAuthSuccess(`Reset link sent to ${forgotEmail}!`); }
   };
 
-  const handleLogout = async () => { await supabase.auth.signOut(); showToast("See you soon!"); };
+  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); showToast("See you soon!"); };
 
-  // Combine DB listings with sample listings (sample only shown if no DB listings yet)
+  const getEmoji = (activityType: string) => ACTIVITY_EMOJIS[activityType] || ACTIVITY_EMOJIS["Default"];
+  const getSuburbs = (json: string) => { try { return JSON.parse(json); } catch { return []; } };
+
   const sampleLessons = [
     { id:"sample-1", type:"tennis", emoji:"🎾", sport:"Tennis", title:"Beginner to Intermediate Tennis Coaching", provider:"Coach Sarah Mitchell", suburb:"Richmond", postcode:"3121", price:75, rating:4.9, reviews:82, featured:true, isDb:false },
     { id:"sample-2", type:"piano", emoji:"🎹", sport:"Piano", title:"Classical & Contemporary Piano for All Ages", provider:"James Okonkwo", suburb:"Carlton", postcode:"3053", price:65, rating:4.8, reviews:47, badge:"New", isDb:false },
@@ -117,35 +152,18 @@ export default function PlayUp() {
     { id:"sample-6", type:"martial arts", emoji:"🥋", sport:"Martial Arts", title:"Brazilian Jiu-Jitsu – Kids & Adults Classes", provider:"Hawthorn BJJ Academy", suburb:"Hawthorn", postcode:"3122", price:60, rating:4.9, reviews:125, badge:"Popular", isDb:false },
   ];
 
-  console.log("DB listings count:", dbListings.length, "listings:", dbListings);
   const dbLessonsFormatted = dbListings.map(l => {
     const suburbs = getSuburbs(l.suburbs);
     const firstSuburb = suburbs[0] || {};
-    return {
-      id: l.id,
-      type: l.activity_type.toLowerCase().replace(/\s+/g,"-"),
-      emoji: getEmoji(l.activity_type),
-      sport: l.activity_type,
-      title: l.lesson_title,
-      provider: l.provider_name,
-      suburb: firstSuburb.name || "",
-      postcode: firstSuburb.postcode || "",
-      price: l.price,
-      rating: 0,
-      reviews: 0,
-      isDb: true,
-      badge: "New" as string | undefined,
-    };
+    return { id:l.id, type:l.activity_type.toLowerCase().replace(/\s+/g,"-"), emoji:getEmoji(l.activity_type), sport:l.activity_type, title:l.lesson_title, provider:l.provider_name, suburb:firstSuburb.name||"", postcode:firstSuburb.postcode||"", price:l.price, rating:0, reviews:0, isDb:true, badge:"New" as string|undefined };
   });
 
-  const allLessons = dbLessonsFormatted.length > 0
-    ? [...dbLessonsFormatted, ...sampleLessons]
-    : sampleLessons;
+  const allLessons = dbLessonsFormatted.length > 0 ? [...dbLessonsFormatted, ...sampleLessons] : sampleLessons;
 
   const filtered = allLessons.filter(l => {
-    const matchesType = activeFilter === "all" || l.type.includes(activeFilter) || l.sport.toLowerCase().includes(activeFilter);
-    const matchesText = searchText === "" || l.title.toLowerCase().includes(searchText.toLowerCase()) || l.sport.toLowerCase().includes(searchText.toLowerCase()) || l.provider.toLowerCase().includes(searchText.toLowerCase());
-    const matchesPostcode = searchPostcode === "" || l.postcode.includes(searchPostcode) || l.suburb.toLowerCase().includes(searchPostcode.toLowerCase());
+    const matchesType = activeFilter==="all" || l.type.includes(activeFilter) || l.sport.toLowerCase().includes(activeFilter);
+    const matchesText = searchText==="" || l.title.toLowerCase().includes(searchText.toLowerCase()) || l.sport.toLowerCase().includes(searchText.toLowerCase()) || l.provider.toLowerCase().includes(searchText.toLowerCase());
+    const matchesPostcode = searchPostcode==="" || l.postcode.includes(searchPostcode) || l.suburb.toLowerCase().includes(searchPostcode.toLowerCase());
     return matchesType && matchesText && matchesPostcode;
   });
 
@@ -155,10 +173,11 @@ export default function PlayUp() {
     { id:"3", emoji:"🏀", sport:"Basketball", title:"3-on-3 Street Basketball – All Welcome", host:"Dev P.", location:"Docklands Basketball Courts", postcode:"3008", date:"Saturday 22 Mar, 3:00 PM", joined:1, total:6, cost:"Free", color:"blue" },
   ];
 
-  const filteredEvents = events.filter(e => searchPostcode === "" || e.postcode.includes(searchPostcode) || e.location.toLowerCase().includes(searchPostcode.toLowerCase()));
+  const filteredEvents = events.filter(e => searchPostcode==="" || e.postcode.includes(searchPostcode) || e.location.toLowerCase().includes(searchPostcode.toLowerCase()));
   const colorMap: Record<string,string> = { orange:"#F97316", lime:"#84CC16", blue:"#3B82F6" };
   const inputStyle = { width:"100%", background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:10, padding:"0.7rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif" };
   const labelStyle = { display:"block" as const, fontSize:"0.78rem", fontWeight:700, letterSpacing:0.8, textTransform:"uppercase" as const, color:"#64748b", marginBottom:"0.4rem" };
+  const formatTime = (d: string) => { const date = new Date(d); const diff = Date.now()-date.getTime(); if(diff<3600000) return `${Math.floor(diff/60000)}m ago`; if(diff<86400000) return date.toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit"}); return date.toLocaleDateString("en-AU",{day:"numeric",month:"short"}); };
 
   return (
     <>
@@ -170,13 +189,17 @@ export default function PlayUp() {
         input,select,textarea{font-family:'DM Sans',sans-serif;}
         @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         .lesson-card:hover{transform:translateY(-3px)!important;box-shadow:0 8px 32px rgba(30,58,95,0.12)!important;border-color:#bfdbfe!important;}
         .event-card:hover{transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(30,58,95,0.1)!important;}
         select option{background:#ffffff;color:#1e3a5f;}
+        .conv-row{padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:8px;transition:background 0.15s;}
+        .conv-row:hover{background:#f8faff;}
       `}</style>
 
-      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #e0f0ff",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
+      {/* NAV */}
+      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:200,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #e0f0ff",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
         <div style={{display:"flex",gap:"2rem"}}>
           {["Lessons","Events"].map(t=>(
@@ -187,6 +210,52 @@ export default function PlayUp() {
         <div style={{display:"flex",gap:"0.8rem",alignItems:"center"}}>
           {user ? (
             <>
+              {/* MESSAGES BUTTON WITH UNREAD DOT */}
+              <div ref={msgPanelRef} style={{position:"relative"}}>
+                <button className="btn" onClick={()=>setShowMsgPanel(!showMsgPanel)}
+                  style={{position:"relative",padding:"0.5rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:showMsgPanel?"#EAF3DE":"white",color:"#1e3a5f",fontSize:"0.85rem",fontWeight:600,display:"flex",alignItems:"center",gap:"0.4rem"}}>
+                  💬 Messages
+                  {unreadCount > 0 && (
+                    <span style={{background:"#EF4444",color:"white",fontSize:"0.65rem",fontWeight:700,padding:"1px 5px",borderRadius:999,minWidth:16,textAlign:"center"}}>{unreadCount}</span>
+                  )}
+                </button>
+
+                {/* SLIDE-IN PANEL */}
+                {showMsgPanel && (
+                  <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"white",borderRadius:16,border:"1px solid #dbeafe",boxShadow:"0 8px 32px rgba(30,58,95,0.15)",zIndex:300,animation:"slideInRight 0.2s ease",overflow:"hidden"}}>
+                    <div style={{padding:"1rem 1.2rem",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",letterSpacing:1,color:"#1e3a5f"}}>Messages</div>
+                      <button className="btn" onClick={()=>router.push("/messages")} style={{fontSize:"0.75rem",color:"#84CC16",background:"none",border:"none",fontWeight:700}}>See all →</button>
+                    </div>
+                    {conversations.length === 0 ? (
+                      <div style={{padding:"1.5rem",textAlign:"center",color:"#64748b"}}>
+                        <div style={{fontSize:"1.5rem",marginBottom:"0.5rem"}}>💬</div>
+                        <div style={{fontSize:"0.82rem"}}>No conversations yet</div>
+                      </div>
+                    ) : conversations.slice(0,5).map(conv => (
+                      <div key={conv.id} className="conv-row" onClick={()=>{setShowMsgPanel(false);router.push(`/messages?conv=${conv.id}`);}}>
+                        <div style={{width:36,height:36,borderRadius:"50%",background:"#1e3a5f",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.75rem",fontWeight:700,color:"#84CC16",flexShrink:0}}>
+                          {(conv.listing?.provider_name||"?").split(" ").map((w:string)=>w[0]).join("").slice(0,2).toUpperCase()}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.15rem"}}>
+                            <span style={{fontSize:"0.82rem",fontWeight:700,color:"#1e3a5f"}}>{conv.listing?.provider_name||"Provider"}</span>
+                            <span style={{fontSize:"0.68rem",color:"#94a3b8"}}>{formatTime(conv.last_message_at)}</span>
+                          </div>
+                          <div style={{fontSize:"0.72rem",color:"#84CC16",fontWeight:600,marginBottom:"0.15rem"}}>{conv.listing?.activity_type}</div>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                            <span style={{fontSize:"0.75rem",color:"#64748b",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:180}}>{conv.last_message}</span>
+                            {(conv.unread_count||0)>0&&<span style={{background:"#EF4444",color:"white",fontSize:"0.62rem",fontWeight:700,padding:"1px 4px",borderRadius:999,flexShrink:0,marginLeft:4}}>{conv.unread_count}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{padding:"0.8rem",borderTop:"1px solid #f1f5f9"}}>
+                      <button className="btn" onClick={()=>{setShowMsgPanel(false);router.push("/messages");}} style={{width:"100%",padding:"0.6rem",background:"#1e3a5f",color:"white",border:"none",borderRadius:8,fontSize:"0.82rem",fontWeight:700}}>Open Messages</button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <span style={{fontSize:"0.85rem",color:"#64748b"}}>👋 {user.email.split("@")[0]}</span>
               <button className="btn" onClick={handleLogout} style={{padding:"0.5rem 1.2rem",border:"1px solid #bfdbfe",borderRadius:999,background:"transparent",color:"#1e3a5f",fontSize:"0.85rem"}}>Log Out</button>
             </>
@@ -199,6 +268,7 @@ export default function PlayUp() {
         </div>
       </nav>
 
+      {/* HERO */}
       <section style={{padding:"5rem 2.5rem 3rem",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",fontFamily:"'Bebas Neue',sans-serif",fontSize:"28vw",color:"rgba(30,58,95,0.04)",top:"-2rem",right:"-2rem",lineHeight:1,pointerEvents:"none",userSelect:"none"}}>PLAY</div>
         <div style={{display:"inline-block",background:"rgba(132,204,22,0.12)",color:"#4d7c0f",fontSize:"0.75rem",fontWeight:700,letterSpacing:2,textTransform:"uppercase",padding:"0.35rem 1rem",borderRadius:999,marginBottom:"1.5rem",border:"1px solid rgba(132,204,22,0.3)"}}>🏙️ Now Across Australia</div>
@@ -248,35 +318,32 @@ export default function PlayUp() {
         ))}
       </div>
 
-      {activeTab==="lessons" && (
+      {activeTab==="lessons"&&(
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,color:"#1e3a5f"}}>
-              {loadingListings ? "Loading Lessons..." : `${filtered.length} Lesson${filtered.length===1?"":"s"} Found`}
-            </div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,color:"#1e3a5f"}}>{loadingListings?"Loading...":filtered.length>0?`${filtered.length} Lesson${filtered.length===1?"":"s"} Found`:"No Lessons Found"}</div>
             <span style={{fontSize:"0.85rem",color:"#84CC16",cursor:"pointer",fontWeight:700}}>See all →</span>
           </div>
-          {loadingListings ? (
+          {loadingListings?(
             <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
               <div style={{width:32,height:32,border:"3px solid #dbeafe",borderTopColor:"#84CC16",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 1rem"}}/>
-              <div>Loading lessons...</div>
+              Loading lessons...
             </div>
-          ) : filtered.length===0 ? (
+          ):filtered.length===0?(
             <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
               <div style={{fontSize:"3rem",marginBottom:"1rem"}}>🔍</div>
-              <div style={{fontSize:"1rem",marginBottom:"0.5rem"}}>No lessons found for that search</div>
+              <div style={{fontSize:"1rem",marginBottom:"0.5rem"}}>No lessons found</div>
               <button className="btn" onClick={()=>{setSearchPostcode("");setSearchText("");setActiveFilter("all");}} style={{marginTop:"1rem",background:"rgba(132,204,22,0.1)",border:"1px solid rgba(132,204,22,0.3)",color:"#4d7c0f",borderRadius:999,padding:"0.5rem 1.2rem",fontSize:"0.85rem"}}>Clear Search</button>
             </div>
-          ) : (
+          ):(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"1.2rem"}}>
               {filtered.map((l,i)=>(
-                <div key={l.id} className="lesson-card" onClick={()=>router.push(l.isDb?`/listings/${l.id}`:`/lessons/${l.id}`)}
-                  style={{background:"white",borderRadius:16,overflow:"hidden",border:"1px solid #dbeafe",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
+                <div key={l.id} className="lesson-card" onClick={()=>router.push(l.isDb?`/listings/${l.id}`:`/lessons/${l.id}`)} style={{background:"white",borderRadius:16,overflow:"hidden",border:"1px solid #dbeafe",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
                   <div style={{height:160,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"4rem",position:"relative",background:"#1e3a5f"}}>
-                    {l.isDb && (l as any).photo_url ? <img src={(l as any).photo_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : l.emoji}
-                    {(l as any).featured && <div style={{position:"absolute",top:"0.8rem",right:"0.8rem",background:"#F97316",color:"white",fontSize:"0.7rem",fontWeight:800,padding:"0.25rem 0.6rem",borderRadius:999}}>Featured</div>}
-                    {(l as any).badge && !((l as any).featured) && <div style={{position:"absolute",top:"0.8rem",right:"0.8rem",background:"#84CC16",color:"#1e3a5f",fontSize:"0.7rem",fontWeight:800,padding:"0.25rem 0.6rem",borderRadius:999}}>{(l as any).badge}</div>}
-                    {l.isDb && <div style={{position:"absolute",top:"0.8rem",left:"0.8rem",background:"#1e3a5f",color:"#84CC16",fontSize:"0.65rem",fontWeight:800,padding:"0.2rem 0.5rem",borderRadius:999,border:"1px solid #84CC16"}}>NEW</div>}
+                    {l.emoji}
+                    {(l as any).featured&&<div style={{position:"absolute",top:"0.8rem",right:"0.8rem",background:"#F97316",color:"white",fontSize:"0.7rem",fontWeight:800,padding:"0.25rem 0.6rem",borderRadius:999}}>Featured</div>}
+                    {(l as any).badge&&!(l as any).featured&&<div style={{position:"absolute",top:"0.8rem",right:"0.8rem",background:"#84CC16",color:"#1e3a5f",fontSize:"0.7rem",fontWeight:800,padding:"0.25rem 0.6rem",borderRadius:999}}>{(l as any).badge}</div>}
+                    {l.isDb&&<div style={{position:"absolute",top:"0.8rem",left:"0.8rem",background:"#1e3a5f",color:"#84CC16",fontSize:"0.65rem",fontWeight:800,padding:"0.2rem 0.5rem",borderRadius:999,border:"1px solid #84CC16"}}>NEW</div>}
                   </div>
                   <div style={{padding:"1.2rem"}}>
                     <div style={{fontSize:"0.7rem",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"#84CC16",marginBottom:"0.4rem"}}>{l.sport}</div>
@@ -286,10 +353,10 @@ export default function PlayUp() {
                       <span style={{color:"#64748b"}}>📍 {l.suburb} <span style={{color:"#94a3b8"}}>{l.postcode}</span></span>
                       <span style={{fontWeight:700,fontSize:"0.95rem",color:"#1e3a5f"}}>${l.price} <span style={{fontSize:"0.7rem",color:"#94a3b8",fontWeight:400}}>/session</span></span>
                     </div>
-                    {!l.isDb && l.rating > 0 && (
+                    {!l.isDb&&(l as any).rating>0&&(
                       <div style={{display:"flex",alignItems:"center",gap:"0.3rem",fontSize:"0.8rem",color:"#64748b",marginTop:"0.6rem"}}>
-                        <span style={{color:"#F59E0B"}}>{"★".repeat(Math.floor(l.rating))}{"☆".repeat(5-Math.floor(l.rating))}</span>
-                        {l.rating} ({l.reviews} reviews)
+                        <span style={{color:"#F59E0B"}}>{"★".repeat(Math.floor((l as any).rating))}{"☆".repeat(5-Math.floor((l as any).rating))}</span>
+                        {(l as any).rating} ({(l as any).reviews} reviews)
                       </div>
                     )}
                     <div style={{marginTop:"0.8rem",fontSize:"0.8rem",color:"#84CC16",fontWeight:700}}>View Details →</div>
@@ -301,7 +368,7 @@ export default function PlayUp() {
         </section>
       )}
 
-      {activeTab==="events" && (
+      {activeTab==="events"&&(
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,color:"#1e3a5f"}}>{filteredEvents.length>0?`${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You`:"No Events Found"}</div>
@@ -337,7 +404,7 @@ export default function PlayUp() {
           <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2.2rem",letterSpacing:1,marginBottom:"0.5rem",color:"white"}}>Are You a <span style={{color:"#84CC16"}}>Lesson Provider?</span></h2>
           <p style={{color:"#93c5fd",fontSize:"0.9rem",maxWidth:400,lineHeight:1.6}}>List your lessons on PlayUp and reach thousands of learners across Australia.</p>
           <div style={{display:"flex",gap:"1.5rem",marginTop:"1.2rem",flexWrap:"wrap"}}>
-            {["Free listing to start","Admin reviewed & verified","In-app messaging","Students come to you"].map(p=>(
+            {["Free listing to start","Admin reviewed","In-app messaging","Students come to you"].map(p=>(
               <div key={p} style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:"#93c5fd"}}><div style={{width:6,height:6,borderRadius:"50%",background:"#84CC16"}}/>{p}</div>
             ))}
           </div>
@@ -397,7 +464,7 @@ export default function PlayUp() {
               <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem",color:"#1e3a5f"}}>List Your Lesson</h3>
               <p style={{color:"#64748b",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Ready to reach students across Australia?</p>
               <div style={{background:"#f8faff",borderRadius:12,padding:"1.2rem",border:"1px solid #dbeafe",marginBottom:"1.5rem"}}>
-                {["Free listing to get started","Admin reviewed & verified","In-app messaging with students","Get listed in under 5 minutes"].map(p=>(
+                {["Free listing to get started","Admin reviewed & verified","In-app messaging","Get listed in under 5 minutes"].map(p=>(
                   <div key={p} style={{display:"flex",alignItems:"center",gap:"0.6rem",fontSize:"0.88rem",color:"#475569",marginBottom:"0.5rem"}}><span style={{color:"#84CC16",fontWeight:700}}>✓</span>{p}</div>
                 ))}
               </div>
