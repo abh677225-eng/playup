@@ -1,5 +1,9 @@
 "use client";
 
+export default function Page() {
+  return <div>Messages page</div>;
+}
+
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
