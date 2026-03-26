@@ -1,25 +1,30 @@
-import { Suspense } from "react";
 import MessagesClient from "./MessagesClient";
+import { createSupabaseServer } from "../../lib/supabase-server";
 
-export default function MessagesPage() {
+export default async function MessagesPage() {
+  const supabase = await createSupabaseServer();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select(`
+      *,
+      listings (
+        lesson_title,
+        activity_type,
+        provider_name
+      )
+    `)
+    .or(`seeker_id.eq.${user.id},provider_id.eq.${user.id}`)
+    .order("last_message_at", { ascending: false });
+
   return (
-    <Suspense
-      fallback={
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "100vh",
-            fontFamily: "sans-serif",
-            color: "#64748b",
-          }}
-        >
-          Loading messages...
-        </div>
-      }
-    >
-      <MessagesClient />
-    </Suspense>
+    <MessagesClient
+      initialConversations={conversations || []}
+      user={user}
+    />
   );
 }
