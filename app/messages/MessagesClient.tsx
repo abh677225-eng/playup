@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-type User = { id: string; email: string; first_name?: string } | null;
+type User = { id: string; email: string } | null;
 type Conversation = {
   id: string;
   listing_id: string;
@@ -13,7 +13,7 @@ type Conversation = {
   last_message: string;
   last_message_at: string;
   listing?: { lesson_title: string; activity_type: string; provider_name: string };
-  other_party?: { email: string; first_name?: string };
+  other_party?: { email: string };
   unread_count?: number;
 };
 type Message = {
@@ -22,7 +22,6 @@ type Message = {
   message: string;
   created_at: string;
   read: boolean;
-  sender?: { first_name?: string };
 };
 
 export default function Messages() {
@@ -88,18 +87,14 @@ export default function Messages() {
   const selectConversation = async (conv: Conversation) => {
     setSelectedConv(conv);
     setLoadingMessages(true);
-
-    // Fetch messages and join sender profile for first_name
     const { data } = await supabase
       .from("messages")
-      .select("*, sender:profiles(first_name)")
+      .select("*")
       .eq("listing_id", conv.listing_id)
       .or(`sender_id.eq.${conv.seeker_id},sender_id.eq.${conv.provider_id}`)
       .order("created_at", { ascending: true });
-
     setMessages(data || []);
     setLoadingMessages(false);
-
     if (user) {
       await supabase.from("messages").update({ read: true }).eq("listing_id", conv.listing_id).eq("receiver_id", user.id).eq("read", false);
       setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
@@ -116,13 +111,22 @@ export default function Messages() {
       receiver_id: receiverId,
       message: newMessage.trim(),
       read: false,
-    }).select("*, sender:profiles(first_name)").single();
+    }).select().single();
     if (!error && data) {
       setMessages(prev => [...prev, data]);
       await supabase.from("conversations").update({ last_message: newMessage.trim(), last_message_at: new Date().toISOString() }).eq("id", selectedConv.id);
     }
     setNewMessage("");
     setSending(false);
+  };
+
+  // Returns "You" for current user, or the provider_name first word for the other party
+  const getSenderName = (msg: Message) => {
+    if (!selectedConv) return "Them";
+    if (msg.sender_id === user?.id) return "You";
+    // Use provider_name first name from the listing as the other party's name
+    const providerName = selectedConv.listing?.provider_name || "Them";
+    return providerName.split(" ")[0];
   };
 
   const formatTime = (d: string) => {
@@ -133,11 +137,6 @@ export default function Messages() {
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
     return date.toLocaleDateString("en-AU", { day: "numeric", month: "short" }) + " " + date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const getSenderName = (msg: Message) => {
-    if (msg.sender_id === user?.id) return "You";
-    return msg.sender?.first_name || "Them";
   };
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
