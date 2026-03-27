@@ -27,6 +27,26 @@ type Conversation = {
   listing?: { lesson_title: string; activity_type: string; provider_name: string };
   unread_count?: number;
 };
+type Event = {
+  id: string;
+  host_id: string;
+  host_name: string;
+  title: string;
+  sport: string;
+  description: string;
+  location: string;
+  suburb: string;
+  postcode: string;
+  date: string;
+  time: string;
+  duration: string;
+  cost: string;
+  spots_total: number;
+  spots_filled: number;
+  skill_level: string;
+  age_group: string;
+  status: string;
+};
 
 const ACTIVITY_EMOJIS: Record<string,string> = {
   "Tennis":"🎾","Piano":"🎹","Swimming":"🏊","Yoga":"🧘","Guitar":"🎸",
@@ -34,6 +54,16 @@ const ACTIVITY_EMOJIS: Record<string,string> = {
   "Football (Soccer)":"⚽","Cricket":"🏏","Cooking":"👨‍🍳","Coding & Programming":"💻",
   "Art & Drawing":"🎨","Violin":"🎻","Drums":"🥁","Boxing":"🥊",
   "Golf":"⛳","Cycling":"🚴","Running":"🏃","Default":"📚"
+};
+
+const SPORT_EMOJIS: Record<string,string> = {
+  "Tennis":"🎾","Swimming":"🏊","Basketball":"🏀","Football (Soccer)":"⚽",
+  "Cricket":"🏏","Boxing":"🥊","Golf":"⛳","Cycling":"🚴","Running":"🏃",
+  "Volleyball":"🏐","Rugby":"🏉","Baseball":"⚾","Hockey":"🏑","Badminton":"🏸",
+  "Table Tennis":"🏓","Skiing":"⛷️","Surfing":"🏄","Sailing":"⛵","Gymnastics":"🤸",
+  "Martial Arts":"🥋","Dancing":"💃","Crossfit":"💪","Netball":"🏀",
+  "Football (AFL)":"🏈","Skateboarding":"🛹","Kayaking":"🚣","Rock Climbing":"🧗",
+  "Athletics":"🏃","Touch Football":"🏉","Squash":"🎾","Other":"🏅"
 };
 
 export default function PlayUp() {
@@ -56,6 +86,8 @@ export default function PlayUp() {
   const [loginView, setLoginView] = useState<"login"|"forgot">("login");
   const [dbListings, setDbListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
+  const [dbEvents, setDbEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [showMsgPanel, setShowMsgPanel] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -70,6 +102,7 @@ export default function PlayUp() {
       else setUser(null);
     });
     loadListings();
+    loadEvents();
     return () => subscription.unsubscribe();
   }, []);
 
@@ -91,6 +124,13 @@ export default function PlayUp() {
     const { data } = await supabase.from("listings").select("*").eq("status","approved").order("created_at", { ascending: false });
     setDbListings(data || []);
     setLoadingListings(false);
+  };
+
+  const loadEvents = async () => {
+    setLoadingEvents(true);
+    const { data } = await supabase.from("events").select("*").eq("status","approved").order("created_at", { ascending: false });
+    setDbEvents(data || []);
+    setLoadingEvents(false);
   };
 
   const loadConversations = async () => {
@@ -167,14 +207,10 @@ export default function PlayUp() {
     return matchesType && matchesText && matchesPostcode;
   });
 
-  const events = [
-    { id:"1", emoji:"⚽", sport:"Soccer", title:"Casual 7-a-Side Soccer – Weekend Kick Around", host:"Marcus T.", location:"Edinburgh Gardens, Fitzroy North", postcode:"3068", date:"Saturday 22 Mar, 9:00 AM", joined:5, total:7, cost:"Free", color:"orange" },
-    { id:"2", emoji:"🎾", sport:"Tennis", title:"Doubles Tennis – Intermediate Level Players", host:"Anika R.", location:"Burnley Tennis Club, Richmond", postcode:"3121", date:"Sunday 23 Mar, 7:30 AM", joined:1, total:4, cost:"$10 court split", color:"lime" },
-    { id:"3", emoji:"🏀", sport:"Basketball", title:"3-on-3 Street Basketball – All Welcome", host:"Dev P.", location:"Docklands Basketball Courts", postcode:"3008", date:"Saturday 22 Mar, 3:00 PM", joined:1, total:6, cost:"Free", color:"blue" },
-  ];
+  const filteredEvents = dbEvents.filter(e =>
+    searchPostcode==="" || e.postcode.includes(searchPostcode) || e.suburb.toLowerCase().includes(searchPostcode.toLowerCase()) || e.location.toLowerCase().includes(searchPostcode.toLowerCase())
+  );
 
-  const filteredEvents = events.filter(e => searchPostcode==="" || e.postcode.includes(searchPostcode) || e.location.toLowerCase().includes(searchPostcode.toLowerCase()));
-  const colorMap: Record<string,string> = { orange:"#F97316", lime:"#84CC16", blue:"#3B82F6" };
   const inputStyle = { width:"100%", background:"#f8faff", border:"1px solid #bfdbfe", borderRadius:10, padding:"0.7rem 1rem", color:"#1e3a5f", fontSize:"0.9rem", outline:"none", fontFamily:"'DM Sans',sans-serif" };
   const labelStyle = { display:"block" as const, fontSize:"0.78rem", fontWeight:700, letterSpacing:0.8, textTransform:"uppercase" as const, color:"#64748b", marginBottom:"0.4rem" };
   const formatTime = (d: string) => { const date = new Date(d); const diff = Date.now()-date.getTime(); if(diff<3600000) return `${Math.floor(diff/60000)}m ago`; if(diff<86400000) return date.toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit"}); return date.toLocaleDateString("en-AU",{day:"numeric",month:"short"}); };
@@ -198,7 +234,6 @@ export default function PlayUp() {
         .conv-row:hover{background:#f8faff;}
       `}</style>
 
-      {/* NAV */}
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:200,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #e0f0ff",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
         <div style={{display:"flex",gap:"2rem"}}>
@@ -210,17 +245,12 @@ export default function PlayUp() {
         <div style={{display:"flex",gap:"0.8rem",alignItems:"center"}}>
           {user ? (
             <>
-              {/* MESSAGES BUTTON WITH UNREAD DOT */}
               <div ref={msgPanelRef} style={{position:"relative"}}>
                 <button className="btn" onClick={()=>setShowMsgPanel(!showMsgPanel)}
                   style={{position:"relative",padding:"0.5rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:showMsgPanel?"#EAF3DE":"white",color:"#1e3a5f",fontSize:"0.85rem",fontWeight:600,display:"flex",alignItems:"center",gap:"0.4rem"}}>
                   💬 Messages
-                  {unreadCount > 0 && (
-                    <span style={{background:"#EF4444",color:"white",fontSize:"0.65rem",fontWeight:700,padding:"1px 5px",borderRadius:999,minWidth:16,textAlign:"center"}}>{unreadCount}</span>
-                  )}
+                  {unreadCount > 0 && <span style={{background:"#EF4444",color:"white",fontSize:"0.65rem",fontWeight:700,padding:"1px 5px",borderRadius:999,minWidth:16,textAlign:"center"}}>{unreadCount}</span>}
                 </button>
-
-                {/* SLIDE-IN PANEL */}
                 {showMsgPanel && (
                   <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"white",borderRadius:16,border:"1px solid #dbeafe",boxShadow:"0 8px 32px rgba(30,58,95,0.15)",zIndex:300,animation:"slideInRight 0.2s ease",overflow:"hidden"}}>
                     <div style={{padding:"1rem 1.2rem",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -268,7 +298,6 @@ export default function PlayUp() {
         </div>
       </nav>
 
-      {/* HERO */}
       <section style={{padding:"5rem 2.5rem 3rem",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",fontFamily:"'Bebas Neue',sans-serif",fontSize:"28vw",color:"rgba(30,58,95,0.04)",top:"-2rem",right:"-2rem",lineHeight:1,pointerEvents:"none",userSelect:"none"}}>PLAY</div>
         <div style={{display:"inline-block",background:"rgba(132,204,22,0.12)",color:"#4d7c0f",fontSize:"0.75rem",fontWeight:700,letterSpacing:2,textTransform:"uppercase",padding:"0.35rem 1rem",borderRadius:999,marginBottom:"1.5rem",border:"1px solid rgba(132,204,22,0.3)"}}>🏙️ Now Across Australia</div>
@@ -371,31 +400,66 @@ export default function PlayUp() {
       {activeTab==="events"&&(
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,color:"#1e3a5f"}}>{filteredEvents.length>0?`${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You`:"No Events Found"}</div>
-            <button className="btn" onClick={()=>user?setModal("event"):openLogin()} style={{borderRadius:999,fontSize:"0.85rem",padding:"0.5rem 1.2rem",background:"#84CC16",color:"#1e3a5f",border:"none",fontWeight:700}}>+ Create Event</button>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,color:"#1e3a5f"}}>
+              {loadingEvents?"Loading...":filteredEvents.length>0?`${filteredEvents.length} Event${filteredEvents.length===1?"":"s"} Near You`:"No Events Found"}
+            </div>
+            <button className="btn" onClick={()=>user?router.push("/events/create"):openLogin()}
+              style={{borderRadius:999,fontSize:"0.85rem",padding:"0.5rem 1.2rem",background:"#84CC16",color:"#1e3a5f",border:"none",fontWeight:700}}>
+              + Post an Event
+            </button>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:"1.2rem"}}>
-            {filteredEvents.map((ev,i)=>{
-              const c=colorMap[ev.color];const spotsLeft=ev.total-ev.joined;
-              return (
-                <div key={ev.id} className="event-card" onClick={()=>router.push(`/events/${ev.id}`)} style={{background:"white",borderRadius:16,padding:"1.4rem",border:"1px solid #dbeafe",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",borderTop:`3px solid ${c}`,boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
-                  <div style={{fontSize:"2.2rem",marginBottom:"0.5rem"}}>{ev.emoji}</div>
-                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"1rem"}}>
-                    <div style={{fontSize:"0.7rem",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:c}}>{ev.sport}</div>
-                    <span style={{background:`${c}15`,color:c,border:`1px solid ${c}40`,fontSize:"0.75rem",fontWeight:700,padding:"0.3rem 0.7rem",borderRadius:999}}>{spotsLeft<=2?`${spotsLeft} spot${spotsLeft===1?"":"s"} left!`:`${spotsLeft} spots`}</span>
+
+          {loadingEvents?(
+            <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
+              <div style={{width:32,height:32,border:"3px solid #dbeafe",borderTopColor:"#84CC16",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 1rem"}}/>
+              Loading events...
+            </div>
+          ):filteredEvents.length===0?(
+            <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
+              <div style={{fontSize:"2.5rem",marginBottom:"0.8rem"}}>⚽</div>
+              <div style={{fontWeight:600,color:"#1e3a5f",fontSize:"1rem",marginBottom:"0.4rem"}}>No events yet</div>
+              <div style={{fontSize:"0.85rem",marginBottom:"1.5rem"}}>Be the first to post a community event!</div>
+              <button className="btn" onClick={()=>user?router.push("/events/create"):openLogin()}
+                style={{padding:"0.7rem 1.5rem",background:"#84CC16",color:"#1e3a5f",border:"none",borderRadius:999,fontWeight:700,fontSize:"0.88rem"}}>
+                + Post an Event
+              </button>
+            </div>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"1.2rem"}}>
+              {filteredEvents.map((ev,i)=>{
+                const spotsLeft=ev.spots_total-ev.spots_filled;
+                const isFull=spotsLeft<=0;
+                const emoji=SPORT_EMOJIS[ev.sport]||"🏅";
+                return (
+                  <div key={ev.id} className="event-card" onClick={()=>router.push(`/events/${ev.id}`)}
+                    style={{background:"white",borderRadius:16,border:"1px solid #dbeafe",overflow:"hidden",cursor:"pointer",animation:`fadeInUp 0.4s ease ${i*0.05}s both`,transition:"all 0.25s",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
+                    <div style={{background:"#1e3a5f",padding:"1.2rem",position:"relative",overflow:"hidden"}}>
+                      <div style={{position:"absolute",fontSize:"5rem",right:"-0.5rem",top:"-0.5rem",opacity:0.1,pointerEvents:"none"}}>{emoji}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.6rem"}}>
+                        <span style={{fontSize:"0.68rem",fontWeight:700,letterSpacing:1,textTransform:"uppercase",color:"#84CC16",background:"rgba(132,204,22,0.15)",padding:"0.2rem 0.6rem",borderRadius:999,border:"1px solid rgba(132,204,22,0.3)"}}>{ev.sport}</span>
+                        {isFull?<span style={{fontSize:"0.68rem",fontWeight:700,padding:"0.2rem 0.6rem",borderRadius:999,background:"rgba(239,68,68,0.2)",color:"#EF4444"}}>🔒 Full</span>
+                        :spotsLeft<=2?<span style={{fontSize:"0.68rem",fontWeight:700,padding:"0.2rem 0.6rem",borderRadius:999,background:"rgba(249,115,22,0.2)",color:"#F97316"}}>⚡ {spotsLeft} left</span>
+                        :<span style={{fontSize:"0.68rem",fontWeight:700,padding:"0.2rem 0.6rem",borderRadius:999,background:"rgba(132,204,22,0.15)",color:"#84CC16"}}>{spotsLeft} spots</span>}
+                      </div>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.15rem",letterSpacing:0.5,color:"white",lineHeight:1.2,marginBottom:"0.5rem"}}>{ev.title}</div>
+                      <div style={{fontSize:"0.78rem",color:"#93c5fd"}}>👤 {ev.host_name}</div>
+                    </div>
+                    <div style={{padding:"1rem"}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:"0.35rem",fontSize:"0.82rem",color:"#475569",marginBottom:"0.8rem"}}>
+                        <div>📍 {ev.location}, {ev.suburb}</div>
+                        <div>📅 {ev.date} at {ev.time} · {ev.duration}</div>
+                        <div style={{fontWeight:600,color:ev.cost==="Free"?"#84CC16":"#1e3a5f"}}>{ev.cost==="Free"?"🎉 Free":`💰 ${ev.cost}`}</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <div style={{fontSize:"0.78rem",color:"#94a3b8"}}>{ev.skill_level} · {ev.age_group}</div>
+                        <div style={{fontSize:"0.78rem",fontWeight:700,color:"#84CC16"}}>View →</div>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{fontSize:"1.05rem",fontWeight:700,marginBottom:"0.4rem",lineHeight:1.3,color:"#1e3a5f"}}>{ev.title}</div>
-                  <div style={{fontSize:"0.82rem",color:"#64748b",marginBottom:"1rem"}}>Hosted by {ev.host}</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:"0.4rem",marginBottom:"1.2rem"}}>
-                    {[["📅",ev.date],["📍",`${ev.location} (${ev.postcode})`],["👥",`${ev.joined} joined · looking for ${spotsLeft} more`],["💰",ev.cost]].map(([icon,text])=>(
-                      <div key={text} style={{display:"flex",alignItems:"center",gap:"0.6rem",fontSize:"0.82rem",color:"#64748b"}}><span>{icon}</span><span>{text}</span></div>
-                    ))}
-                  </div>
-                  <div style={{fontSize:"0.8rem",color:c,fontWeight:700}}>View Details →</div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
@@ -470,25 +534,6 @@ export default function PlayUp() {
               </div>
               <button className="btn" onClick={()=>{setModal(null);router.push("/provider/create");}} style={{width:"100%",padding:"0.85rem",background:"#84CC16",color:"#1e3a5f",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginBottom:"0.8rem"}}>Start My Listing →</button>
               <button className="btn" onClick={()=>setModal(null)} style={{width:"100%",padding:"0.7rem",background:"transparent",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,fontWeight:500,fontSize:"0.9rem"}}>Maybe Later</button>
-            </>}
-
-            {modal==="event"&&<>
-              <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.8rem",letterSpacing:1,marginBottom:"0.3rem",color:"#1e3a5f"}}>Create an Event</h3>
-              <p style={{color:"#64748b",fontSize:"0.88rem",marginBottom:"1.5rem"}}>Find players to join your game</p>
-              <div style={{marginBottom:"1rem"}}><label style={labelStyle}>Event Title</label><input placeholder="e.g. Casual soccer at Edinburgh Gardens" style={inputStyle}/></div>
-              <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:1}}><label style={labelStyle}>Sport</label><select style={inputStyle}>{["Soccer","Tennis","Basketball","Cricket","Volleyball","Badminton","Other"].map(o=><option key={o}>{o}</option>)}</select></div>
-                <div style={{flex:1}}><label style={labelStyle}>Players Needed</label><input type="number" placeholder="e.g. 4" style={inputStyle}/></div>
-              </div>
-              <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:1}}><label style={labelStyle}>Date</label><input type="date" style={inputStyle}/></div>
-                <div style={{flex:1}}><label style={labelStyle}>Time</label><input type="time" style={inputStyle}/></div>
-              </div>
-              <div style={{display:"flex",gap:"0.8rem",marginBottom:"1rem"}}>
-                <div style={{flex:2}}><label style={labelStyle}>Location</label><input placeholder="e.g. Edinburgh Gardens, Fitzroy North" style={inputStyle}/></div>
-                <div style={{flex:1}}><label style={labelStyle}>Postcode</label><input placeholder="e.g. 3068" style={inputStyle}/></div>
-              </div>
-              <button className="btn" onClick={()=>{setModal(null);showToast("Event posted! Players will find you.");}} style={{width:"100%",padding:"0.85rem",background:"#84CC16",color:"#1e3a5f",border:"none",borderRadius:10,fontWeight:700,fontSize:"1rem",marginTop:"0.5rem"}}>Post My Event</button>
             </>}
           </div>
         </div>
