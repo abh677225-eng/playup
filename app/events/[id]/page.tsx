@@ -27,6 +27,14 @@ type Event = {
   status: string;
   created_at: string;
 };
+type EventRequest = {
+  id: string;
+  requester_id: string;
+  requester_name: string;
+  message: string;
+  status: string;
+  created_at: string;
+};
 
 const SPORT_EMOJIS: Record<string,string> = {
   "Tennis":"🎾","Swimming":"🏊","Basketball":"🏀","Football (Soccer)":"⚽",
@@ -61,10 +69,12 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [myRequest, setMyRequest] = useState<{status:string}|null>(null);
+  const [requests, setRequests] = useState<EventRequest[]>([]);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinName, setJoinName] = useState("");
   const [joinMsg, setJoinMsg] = useState("");
   const [joining, setJoining] = useState(false);
+  const [requestActionLoading, setRequestActionLoading] = useState<string|null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -82,7 +92,10 @@ export default function EventDetail() {
   }, []);
 
   useEffect(() => {
-    if (user && event) loadMyRequest();
+    if (user && event) {
+      loadMyRequest();
+      if (user.id === event.host_id) loadRequests();
+    }
   }, [user, event]);
 
   const loadEvent = async () => {
@@ -98,13 +111,22 @@ export default function EventDetail() {
     if (data) setMyRequest(data);
   };
 
+  const loadRequests = async () => {
+    if (!event) return;
+    const { data } = await supabase
+      .from("event_requests")
+      .select("*")
+      .eq("event_id", event.id)
+      .order("created_at", { ascending: true });
+    setRequests(data || []);
+  };
+
   const handleJoin = async () => {
     if (!user || !event || joining) return;
     if (!joinName.trim()) { showToast("Please enter your name"); return; }
     setJoining(true);
-
     try {
-      // 1. Save the join request
+      // Save join request — DO NOT increment spots_filled yet (host must approve first)
       const { error: reqError } = await supabase.from("event_requests").insert({
         event_id: event.id,
         requester_id: user.id,
@@ -114,11 +136,7 @@ export default function EventDetail() {
       });
       if (reqError) throw reqError;
 
-      // 2. Update spots_filled
-      await supabase.from("events").update({ spots_filled: event.spots_filled + 1 }).eq("id", event.id);
-
-      // 3. Send a message to the host via conversations + messages
-      // Check if conversation exists between requester and host
+      // Send message to host via conversations + messages
       const { data: existingConv } = await supabase
         .from("conversations")
         .select("*")
@@ -149,15 +167,55 @@ export default function EventDetail() {
       });
 
       setMyRequest({ status: "pending" });
-      setEvent(prev => prev ? { ...prev, spots_filled: prev.spots_filled + 1 } : prev);
       setShowJoinModal(false);
       setJoinName("");
       setJoinMsg("");
-      showToast("🎉 Request sent! The host will confirm you soon.");
+      showToast("🎉 Request sent! Waiting for the host to approve.");
     } catch (err: any) {
       showToast(err.message || "Something went wrong. Please try again.");
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleRequestAction = async (requestId: string, requesterId: string, action: "approved" | "rejected") => {
+    if (!event) return;
+    setRequestActionLoading(requestId);
+    try {
+      // Update the request status
+      const { error } = await supabase
+        .from("event_requests")
+        .update({ status: action })
+        .eq("id", requestId);
+      if (error) throw error;
+
+      // If approving, increment spots_filled
+      if (action === "approved") {
+        const newSpotsFilled = event.spots_filled + 1;
+        await supabase.from("events").update({ spots_filled: newSpotsFilled }).eq("id", event.id);
+        setEvent(prev => prev ? { ...prev, spots_filled: newSpotsFilled } : prev);
+      }
+
+      // Send a message to the requester notifying them
+      const notifyMsg = action === "approved"
+        ? `Great news! Your request to join "${event.title}" has been approved. See you there! 🎉`
+        : `Thanks for your interest in "${event.title}". Unfortunately your request wasn't approved this time.`;
+
+      await supabase.from("messages").insert({
+        listing_id: event.id,
+        sender_id: event.host_id,
+        receiver_id: requesterId,
+        message: notifyMsg,
+        read: false,
+      });
+
+      // Update local state
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
+      showToast(action === "approved" ? "✅ Request approved — player notified!" : "❌ Request rejected — player notified.");
+    } catch (err: any) {
+      showToast(err.message || "Something went wrong.");
+    } finally {
+      setRequestActionLoading(null);
     }
   };
 
@@ -202,6 +260,9 @@ export default function EventDetail() {
   const isFull = spotsLeft <= 0;
   const isHost = user?.id === event!.host_id;
   const isCancelledOrClosed = event!.status === "cancelled" || event!.status === "closed";
+  const pendingRequests = requests.filter(r => r.status === "pending");
+  const approvedRequests = requests.filter(r => r.status === "approved");
+  const rejectedRequests = requests.filter(r => r.status === "rejected");
 
   return (
     <>
@@ -213,6 +274,7 @@ export default function EventDetail() {
         @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
+        .request-row:hover{background:#f8faff;}
       `}</style>
 
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #dbeafe",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
@@ -268,7 +330,7 @@ export default function EventDetail() {
                 ["📅","Date",formatDate(event!.date)],
                 ["⏰","Time",`${formatTime(event!.time)} · ${event!.duration}`],
                 ["💰","Cost",event!.cost],
-                ["👥","Spots",`${event!.spots_filled}/${event!.spots_total} filled`],
+                ["👥","Spots",`${event!.spots_filled}/${event!.spots_total} approved`],
                 ["🎯","Skill Level",event!.skill_level],
                 ["🎂","Age Group",event!.age_group],
               ].map(([icon,label,value])=>(
@@ -323,6 +385,75 @@ export default function EventDetail() {
             </div>
           )}
 
+          {/* HOST — MANAGE REQUESTS */}
+          {isHost && (
+            <div style={{background:"white",borderRadius:16,border:"1px solid #dbeafe",marginBottom:"1.5rem",overflow:"hidden",boxShadow:"0 2px 8px rgba(30,58,95,0.06)"}}>
+              <div style={{padding:"1.4rem 1.8rem",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",letterSpacing:1,color:"#1e3a5f"}}>Join Requests</div>
+                  <div style={{fontSize:"0.82rem",color:"#64748b",marginTop:"0.2rem"}}>
+                    {pendingRequests.length} pending · {approvedRequests.length} approved · {rejectedRequests.length} rejected
+                  </div>
+                </div>
+                {pendingRequests.length > 0 && (
+                  <span style={{background:"#EF4444",color:"white",fontSize:"0.75rem",fontWeight:700,padding:"0.2rem 0.7rem",borderRadius:999}}>{pendingRequests.length} new</span>
+                )}
+              </div>
+
+              {requests.length === 0 ? (
+                <div style={{padding:"2rem",textAlign:"center",color:"#64748b",fontSize:"0.88rem"}}>
+                  No requests yet — share your event to get players!
+                </div>
+              ) : (
+                <div>
+                  {requests.map(req => {
+                    const isActioning = requestActionLoading === req.id;
+                    const statusColors: Record<string,string> = { pending:"#F97316", approved:"#84CC16", rejected:"#EF4444" };
+                    const statusBgs: Record<string,string> = { pending:"#FFF7ED", approved:"#EAF3DE", rejected:"#FEF2F2" };
+                    const statusBorders: Record<string,string> = { pending:"#FED7AA", approved:"#97C459", rejected:"#FECACA" };
+                    return (
+                      <div key={req.id} className="request-row" style={{padding:"1.2rem 1.8rem",borderBottom:"1px solid #f1f5f9",transition:"background 0.15s"}}>
+                        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"1rem"}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:"0.6rem",marginBottom:"0.3rem"}}>
+                              <div style={{width:36,height:36,borderRadius:"50%",background:"#1e3a5f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:"0.9rem",color:"#84CC16",flexShrink:0}}>
+                                {req.requester_name.split(" ").map((w:string)=>w[0]).join("").slice(0,2).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{fontWeight:700,fontSize:"0.9rem",color:"#1e3a5f"}}>{req.requester_name}</div>
+                                <div style={{fontSize:"0.72rem",color:"#94a3b8"}}>{new Date(req.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                              </div>
+                              <span style={{fontSize:"0.7rem",fontWeight:700,padding:"0.2rem 0.6rem",borderRadius:999,background:statusBgs[req.status],color:statusColors[req.status],border:`1px solid ${statusBorders[req.status]}`}}>
+                                {req.status.toUpperCase()}
+                              </span>
+                            </div>
+                            {req.message && (
+                              <div style={{fontSize:"0.85rem",color:"#475569",lineHeight:1.5,background:"#f8faff",borderRadius:8,padding:"0.6rem 0.8rem",border:"1px solid #dbeafe",marginTop:"0.4rem"}}>
+                                "{req.message}"
+                              </div>
+                            )}
+                          </div>
+                          {req.status === "pending" && !isCancelledOrClosed && (
+                            <div style={{display:"flex",gap:"0.5rem",flexShrink:0}}>
+                              <button className="btn" onClick={()=>handleRequestAction(req.id, req.requester_id, "approved")} disabled={!!isActioning}
+                                style={{padding:"0.5rem 1rem",background:"#84CC16",color:"#1e3a5f",border:"none",borderRadius:999,fontWeight:700,fontSize:"0.8rem",opacity:isActioning?0.6:1}}>
+                                {isActioning?"...":"✅ Approve"}
+                              </button>
+                              <button className="btn" onClick={()=>handleRequestAction(req.id, req.requester_id, "rejected")} disabled={!!isActioning}
+                                style={{padding:"0.5rem 1rem",background:"#fef2f2",color:"#dc2626",border:"1px solid #fca5a5",borderRadius:999,fontWeight:700,fontSize:"0.8rem",opacity:isActioning?0.6:1}}>
+                                {isActioning?"...":"❌ Reject"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* HOST CONTROLS */}
           {isHost && !isCancelledOrClosed && (
             <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:16,padding:"1.5rem",marginBottom:"1.5rem"}}>
@@ -363,9 +494,14 @@ export default function EventDetail() {
               </div>
 
               {/* SPOTS */}
-              <div style={{background:"#f8faff",border:"1px solid #dbeafe",borderRadius:12,padding:"0.8rem 1rem",marginBottom:"1.2rem",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:"0.85rem",color:"#64748b"}}>Spots filled</span>
-                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",color:"#84CC16",letterSpacing:1}}>{event!.spots_filled}/{event!.spots_total}</span>
+              <div style={{background:"#f8faff",border:"1px solid #dbeafe",borderRadius:12,padding:"0.8rem 1rem",marginBottom:"1.2rem"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.3rem"}}>
+                  <span style={{fontSize:"0.85rem",color:"#64748b"}}>Spots approved</span>
+                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.3rem",color:"#84CC16",letterSpacing:1}}>{event!.spots_filled}/{event!.spots_total}</span>
+                </div>
+                {pendingRequests.length > 0 && isHost && (
+                  <div style={{fontSize:"0.75rem",color:"#F97316",fontWeight:600}}>⏳ {pendingRequests.length} request{pendingRequests.length===1?"":"s"} awaiting approval</div>
+                )}
               </div>
 
               {/* JOIN BUTTON */}
@@ -375,11 +511,15 @@ export default function EventDetail() {
                   <div style={{fontSize:"0.9rem",color:"#dc2626",fontWeight:700}}>{event!.status==="cancelled"?"Event Cancelled":"Event Closed"}</div>
                 </div>
               ) : myRequest ? (
-                <div style={{background:"rgba(132,204,22,0.1)",border:"1px solid rgba(132,204,22,0.3)",borderRadius:12,padding:"1rem",textAlign:"center",marginBottom:"0.8rem"}}>
-                  <div style={{fontSize:"1.5rem",marginBottom:"0.3rem"}}>✅</div>
-                  <div style={{fontSize:"0.9rem",color:"#4d7c0f",fontWeight:700}}>Request Sent!</div>
-                  <div style={{fontSize:"0.8rem",color:"#64748b",marginTop:"0.2rem"}}>
-                    Status: <strong style={{color: myRequest.status==="approved"?"#84CC16":myRequest.status==="rejected"?"#EF4444":"#F97316"}}>{myRequest.status}</strong>
+                <div style={{borderRadius:12,padding:"1rem",textAlign:"center",marginBottom:"0.8rem",background:myRequest.status==="approved"?"#EAF3DE":myRequest.status==="rejected"?"#fef2f2":"rgba(132,204,22,0.08)",border:`1px solid ${myRequest.status==="approved"?"#97C459":myRequest.status==="rejected"?"#fca5a5":"rgba(132,204,22,0.3)"}`}}>
+                  <div style={{fontSize:"1.5rem",marginBottom:"0.3rem"}}>
+                    {myRequest.status==="approved"?"🎉":myRequest.status==="rejected"?"😔":"⏳"}
+                  </div>
+                  <div style={{fontSize:"0.9rem",fontWeight:700,color:myRequest.status==="approved"?"#27500A":myRequest.status==="rejected"?"#dc2626":"#F97316"}}>
+                    {myRequest.status==="approved"?"You're In!":myRequest.status==="rejected"?"Request Declined":"Request Pending"}
+                  </div>
+                  <div style={{fontSize:"0.78rem",color:"#64748b",marginTop:"0.3rem"}}>
+                    {myRequest.status==="approved"?"The host has approved your spot":"Waiting for host to review"}
                   </div>
                 </div>
               ) : isFull ? (
