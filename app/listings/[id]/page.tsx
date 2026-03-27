@@ -61,36 +61,69 @@ export default function ListingDetail() {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  const handleEnquiry = async () => {
-    if (!enquiryMsg.trim() || !user || !listing) return;
-    setSending(true);
-    try {
-      const { data: existingConv } = await supabase.from("conversations").select("*").eq("listing_id", listing.id).eq("seeker_id", user.id).single();
-      let convId = existingConv?.id;
-      if (!convId) {
-        const { data: newConv, error: convError } = await supabase.from("conversations").insert({
-          listing_id: listing.id, seeker_id: user.id, provider_id: listing.user_id,
-          last_message: enquiryMsg, last_message_at: new Date().toISOString(),
-        }).select().single();
-        if (convError) throw convError;
-        convId = newConv.id;
-      }
-      const { error: msgError } = await supabase.from("messages").insert({
-        listing_id: listing.id, sender_id: user.id, receiver_id: listing.user_id,
-        message: enquiryMsg, read: false,
-      });
-      if (msgError) throw msgError;
-      setEnquirySent(true);
-      setShowEnquiry(false);
-      setEnquiryMsg("");
-      showToast("Enquiry sent! The provider will be in touch soon 📧");
-    } catch (err) {
-      console.error(err);
-      showToast("Something went wrong. Please try again.");
-    } finally {
-      setSending(false);
+ const handleEnquiry = async () => {
+  if (!enquiryMsg.trim() || !user || !listing) return;
+  setSending(true);
+  try {
+    // Check for existing conversation
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("listing_id", listing.id)
+      .eq("seeker_id", user.id)
+      .maybeSingle();
+
+    let convId = existing?.id;
+
+    // Only create if one doesn't exist
+    if (!convId) {
+      const { data: newConv, error: convError } = await supabase
+        .from("conversations")
+        .insert({
+          listing_id: listing.id,
+          seeker_id: user.id,
+          provider_id: listing.user_id,
+          last_message: enquiryMsg,
+          last_message_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (convError) throw convError;
+      convId = newConv.id;
+    } else {
+      // Update last message on existing conversation
+      await supabase
+        .from("conversations")
+        .update({
+          last_message: enquiryMsg,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq("id", convId);
     }
-  };
+
+    // Save message
+    const { error: msgError } = await supabase
+      .from("messages")
+      .insert({
+        listing_id: listing.id,
+        sender_id: user.id,
+        receiver_id: listing.user_id,
+        message: enquiryMsg,
+        read: false,
+      });
+    if (msgError) throw msgError;
+
+    setEnquirySent(true);
+    setShowEnquiry(false);
+    setEnquiryMsg("");
+    showToast("Enquiry sent! The provider will be in touch soon 📧");
+  } catch (err) {
+    console.error(err);
+    showToast("Something went wrong. Please try again.");
+  } finally {
+    setSending(false);
+  }
+};
 
   const getEmoji = (type: string) => ACTIVITY_EMOJIS[type] || ACTIVITY_EMOJIS["Default"];
   const getSuburbs = (json: string) => { try { return JSON.parse(json); } catch { return []; } };
