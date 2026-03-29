@@ -96,7 +96,7 @@ export default function EventDetail() {
       loadMyRequest();
       if (user.id === event.host_id) loadRequests();
     }
-  }, [user, event]);
+  }, [user, event?.id]); // depend on event.id only — prevents re-fetching when event state updates
 
   const loadEvent = async () => {
     const { data, error } = await supabase.from("events").select("*").eq("id", params.id).single();
@@ -180,23 +180,40 @@ export default function EventDetail() {
 
   const handleRequestAction = async (requestId: string, requesterId: string, action: "approved" | "rejected") => {
     if (!event) return;
+
+    // Guard: prevent acting on a request that's already been actioned
+    const req = requests.find(r => r.id === requestId);
+    if (!req || req.status !== "pending") return;
+
     setRequestActionLoading(requestId);
+
+    // Optimistically update local state immediately so UI doesn't revert
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
+    if (action === "approved") {
+      setEvent(prev => prev ? { ...prev, spots_filled: prev.spots_filled + 1 } : prev);
+    }
+
     try {
-      // Update the request status
+      // Update the request status in Supabase
       const { error } = await supabase
         .from("event_requests")
         .update({ status: action })
         .eq("id", requestId);
       if (error) throw error;
 
-      // If approving, increment spots_filled
+      // If approving, sync spots_filled from approved count (source of truth)
       if (action === "approved") {
-        const newSpotsFilled = event.spots_filled + 1;
-        await supabase.from("events").update({ spots_filled: newSpotsFilled }).eq("id", event.id);
-        setEvent(prev => prev ? { ...prev, spots_filled: newSpotsFilled } : prev);
+        const { count } = await supabase
+          .from("event_requests")
+          .select("id", { count: "exact" })
+          .eq("event_id", event.id)
+          .eq("status", "approved");
+        const approvedCount = count || 0;
+        await supabase.from("events").update({ spots_filled: approvedCount }).eq("id", event.id);
+        setEvent(prev => prev ? { ...prev, spots_filled: approvedCount } : prev);
       }
 
-      // Send a message to the requester notifying them
+      // Notify the requester via message
       const notifyMsg = action === "approved"
         ? `Great news! Your request to join "${event.title}" has been approved. See you there! 🎉`
         : `Thanks for your interest in "${event.title}". Unfortunately your request wasn't approved this time.`;
@@ -209,10 +226,13 @@ export default function EventDetail() {
         read: false,
       });
 
-      // Update local state
-      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
       showToast(action === "approved" ? "✅ Request approved — player notified!" : "❌ Request rejected — player notified.");
     } catch (err: any) {
+      // Revert optimistic update on failure
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: "pending" } : r));
+      if (action === "approved") {
+        setEvent(prev => prev ? { ...prev, spots_filled: prev.spots_filled - 1 } : prev);
+      }
       showToast(err.message || "Something went wrong.");
     } finally {
       setRequestActionLoading(null);
