@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 
@@ -77,6 +77,7 @@ export default function EventDetail() {
   const [requestActionLoading, setRequestActionLoading] = useState<string|null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [toast, setToast] = useState("");
+  const requestsLoaded = useRef(false); // prevents loadRequests from re-firing on state updates
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
@@ -94,7 +95,10 @@ export default function EventDetail() {
   useEffect(() => {
     if (user && event) {
       loadMyRequest();
-      if (user.id === event.host_id) loadRequests();
+      if (user.id === event.host_id && !requestsLoaded.current) {
+        requestsLoaded.current = true;
+        loadRequests();
+      }
     }
   }, [user, event?.id]); // depend on event.id only — prevents re-fetching when event state updates
 
@@ -181,39 +185,34 @@ export default function EventDetail() {
   const handleRequestAction = async (requestId: string, requesterId: string, action: "approved" | "rejected") => {
     if (!event) return;
 
-    // Guard: prevent acting on a request that's already been actioned
+    // Guard: only act on pending requests, prevent double-clicks
     const req = requests.find(r => r.id === requestId);
     if (!req || req.status !== "pending") return;
 
-    setRequestActionLoading(requestId);
-
-    // Optimistically update local state immediately so UI doesn't revert
+    // Optimistically update UI immediately — before any async calls
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
     if (action === "approved") {
       setEvent(prev => prev ? { ...prev, spots_filled: prev.spots_filled + 1 } : prev);
     }
+    setRequestActionLoading(requestId);
 
     try {
-      // Update the request status in Supabase
+      // Update request status in Supabase
       const { error } = await supabase
         .from("event_requests")
         .update({ status: action })
         .eq("id", requestId);
       if (error) throw error;
 
-      // If approving, sync spots_filled from approved count (source of truth)
+      // Update spots_filled in Supabase (increment or leave unchanged)
       if (action === "approved") {
-        const { count } = await supabase
-          .from("event_requests")
-          .select("id", { count: "exact" })
-          .eq("event_id", event.id)
-          .eq("status", "approved");
-        const approvedCount = count || 0;
-        await supabase.from("events").update({ spots_filled: approvedCount }).eq("id", event.id);
-        setEvent(prev => prev ? { ...prev, spots_filled: approvedCount } : prev);
+        await supabase
+          .from("events")
+          .update({ spots_filled: event.spots_filled + 1 })
+          .eq("id", event.id);
       }
 
-      // Notify the requester via message
+      // Notify requester via message
       const notifyMsg = action === "approved"
         ? `Great news! Your request to join "${event.title}" has been approved. See you there! 🎉`
         : `Thanks for your interest in "${event.title}". Unfortunately your request wasn't approved this time.`;
@@ -226,9 +225,9 @@ export default function EventDetail() {
         read: false,
       });
 
-      showToast(action === "approved" ? "✅ Request approved — player notified!" : "❌ Request rejected — player notified.");
+      showToast(action === "approved" ? "✅ Approved — player notified!" : "❌ Rejected — player notified.");
     } catch (err: any) {
-      // Revert optimistic update on failure
+      // Revert optimistic update if Supabase call failed
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: "pending" } : r));
       if (action === "approved") {
         setEvent(prev => prev ? { ...prev, spots_filled: prev.spots_filled - 1 } : prev);
