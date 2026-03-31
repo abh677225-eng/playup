@@ -302,9 +302,7 @@ function ProfileInner() {
       notes: bookingNotes.trim() || null,
     });
     if (!error) {
-      // Notify student via message if they have a conversation
-      const { data: conv } = await supabase.from("conversations").select("*")
-        .eq("provider_id", user.id).eq("seeker_id", user.id).single().catch(() => ({ data: null }));
+      // Notify student via message if they have a conversation (unused for now)
       showToast("✅ Booking created!");
       setShowBookingModal(false);
       setBookingStudentName(""); setBookingStudentEmail(""); setBookingDate("");
