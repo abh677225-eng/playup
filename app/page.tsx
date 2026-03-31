@@ -234,6 +234,7 @@ export default function PlayUp() {
         .conv-row:hover{background:#f8faff;}
       `}</style>
 
+      {/* NAV */}
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.2rem 2.5rem",position:"sticky",top:0,zIndex:200,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #e0f0ff",boxShadow:"0 1px 12px rgba(30,58,95,0.06)"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",letterSpacing:2}}><span style={{color:"#1e3a5f"}}>Play</span><span style={{color:"#84CC16"}}>Up</span></div>
         <div style={{display:"flex",gap:"2rem"}}>
@@ -286,7 +287,10 @@ export default function PlayUp() {
                   </div>
                 )}
               </div>
-              <span style={{fontSize:"0.85rem",color:"#64748b"}}>👋 {user.email.split("@")[0]}</span>
+              <button className="btn" onClick={()=>router.push("/profile")}
+                style={{padding:"0.5rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:"white",color:"#1e3a5f",fontSize:"0.85rem",fontWeight:600}}>
+                👤 Profile
+              </button>
               <button className="btn" onClick={handleLogout} style={{padding:"0.5rem 1.2rem",border:"1px solid #bfdbfe",borderRadius:999,background:"transparent",color:"#1e3a5f",fontSize:"0.85rem"}}>Log Out</button>
             </>
           ) : (
@@ -298,6 +302,7 @@ export default function PlayUp() {
         </div>
       </nav>
 
+      {/* HERO */}
       <section style={{padding:"5rem 2.5rem 3rem",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",fontFamily:"'Bebas Neue',sans-serif",fontSize:"28vw",color:"rgba(30,58,95,0.04)",top:"-2rem",right:"-2rem",lineHeight:1,pointerEvents:"none",userSelect:"none"}}>PLAY</div>
         <div style={{display:"inline-block",background:"rgba(132,204,22,0.12)",color:"#4d7c0f",fontSize:"0.75rem",fontWeight:700,letterSpacing:2,textTransform:"uppercase",padding:"0.35rem 1rem",borderRadius:999,marginBottom:"1.5rem",border:"1px solid rgba(132,204,22,0.3)"}}>🏙️ Now Across Australia</div>
@@ -347,6 +352,7 @@ export default function PlayUp() {
         ))}
       </div>
 
+      {/* LESSONS TAB */}
       {activeTab==="lessons"&&(
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
@@ -397,6 +403,7 @@ export default function PlayUp() {
         </section>
       )}
 
+      {/* EVENTS TAB */}
       {activeTab==="events"&&(
         <section style={{padding:"0 2.5rem 3rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem"}}>
@@ -408,7 +415,6 @@ export default function PlayUp() {
               + Post an Event
             </button>
           </div>
-
           {loadingEvents?(
             <div style={{textAlign:"center",padding:"3rem",color:"#64748b"}}>
               <div style={{width:32,height:32,border:"3px solid #dbeafe",borderTopColor:"#84CC16",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 1rem"}}/>
@@ -463,6 +469,7 @@ export default function PlayUp() {
         </section>
       )}
 
+      {/* PROVIDER CTA */}
       <div style={{margin:"0 2.5rem 3rem",background:"#1e3a5f",borderRadius:20,padding:"2.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"2rem",flexWrap:"wrap"}}>
         <div>
           <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2.2rem",letterSpacing:1,marginBottom:"0.5rem",color:"white"}}>Are You a <span style={{color:"#84CC16"}}>Lesson Provider?</span></h2>
@@ -484,6 +491,7 @@ export default function PlayUp() {
         <div style={{fontSize:"0.75rem",color:"#60a5fa"}}>© 2026 PlayUp · Australia</div>
       </footer>
 
+      {/* MODALS */}
       {modal&&(
         <div onClick={(e)=>{if(e.target===e.currentTarget)setModal(null);}} style={{position:"fixed",inset:0,background:"rgba(30,58,95,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
           <div style={{background:"white",border:"1px solid #bfdbfe",borderRadius:20,padding:"2rem",width:"90%",maxWidth:480,position:"relative",animation:"slideUp 0.3s ease",boxShadow:"0 20px 60px rgba(30,58,95,0.15)"}}>
