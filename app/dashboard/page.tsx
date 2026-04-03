@@ -22,7 +22,7 @@ type Booking = {
   listing?: { lesson_title: string; activity_type: string; price: number };
 };
 type EventRequest = {
-  id: string; event_id: string; requester_name: string; status: string; created_at: string;
+  id: string; event_id: string; requester_id: string; requester_name: string; status: string; created_at: string;
   message?: string;
   event?: { title: string; sport: string; date: string };
 };
