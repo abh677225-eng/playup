@@ -549,7 +549,7 @@ function DashboardInner() {
             <div style={{display:"flex",gap:"0.4rem"}}>
               {([["provider","📋 Provider"],["organiser","⚽ Organiser"]] as const).map(([role,label])=>(
                 <button key={role} onClick={()=>switchRole(role)}
-                  style={{flex:1,padding:"0.4rem 0.4rem",borderRadius:8,fontWeight:600,fontSize:"0.75rem",cursor:"pointer",border:"none",fontFamily:"'DM Sans',sans-serif",
+                  style={{flex:1,padding:"0.4rem 0.4rem",borderRadius:8,fontWeight:600,fontSize:"0.75rem",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
                     background:activeRole===role?"#1e3a5f":"#f8faff",color:activeRole===role?"#84CC16":"#64748b",border:`1px solid ${activeRole===role?"#1e3a5f":"#dbeafe"}`}}>
                   {label}
                 </button>
