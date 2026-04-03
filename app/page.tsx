@@ -287,6 +287,10 @@ export default function PlayUp() {
                   </div>
                 )}
               </div>
+              <button className="btn" onClick={()=>router.push("/dashboard")}
+                style={{padding:"0.5rem 1rem",border:"1px solid #97C459",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontSize:"0.85rem",fontWeight:700}}>
+                📊 Dashboard
+              </button>
               <button className="btn" onClick={()=>router.push("/profile")}
                 style={{padding:"0.5rem 1rem",border:"1px solid #bfdbfe",borderRadius:999,background:"white",color:"#1e3a5f",fontSize:"0.85rem",fontWeight:600}}>
                 👤 Profile
