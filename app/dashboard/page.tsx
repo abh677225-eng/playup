@@ -490,11 +490,11 @@ function DashboardInner() {
     );
   };
 
-  const providerSections = [
+  const providerSections: { id: string; icon: string; label: string; badge?: number }[] = [
     { id:"listings", icon:"📋", label:"My Listings" },
     { id:"bookings", icon:"📅", label:"Student Bookings" },
   ];
-  const organiserSections = [
+  const organiserSections: { id: string; icon: string; label: string; badge?: number }[] = [
     { id:"events",   icon:"⚽", label:"My Events" },
     { id:"requests", icon:"📩", label:"Join Requests", badge: stats.pendingRequests },
   ];
